@@ -1,0 +1,9 @@
+node_modules/
+.playwright-mcp/
+*.log
+.DS_Store
+
+# Local fork of genius-alray/dsh-model-picker (priority bumped -1 -> -100 to
+# beat dsh-codex-subscription's model seat). Kept out of the plugin workspace
+# repo; provenance recorded in dsh-model-picker/LOCAL.md.
+dsh-model-picker/

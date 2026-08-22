@@ -1,0 +1,15 @@
+{
+  "name": "dsh-plugins",
+  "private": true,
+  "description": "Plugins for DeepSeek Harness, published individually under @creait",
+  "license": "MIT",
+  "author": "Francesco G <francesco@creait.nl>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git"
+  },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "publish-all": "pnpm -r publish --access public"
+  }
+}

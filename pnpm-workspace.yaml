@@ -1,0 +1,6 @@
+packages:
+  - 'gen-limit'
+  - 'hookkit'
+  - 'web-search-searxng'
+  - 'web-fetch'
+  - 'research-mode'
