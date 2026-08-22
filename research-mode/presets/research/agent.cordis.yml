@@ -1,0 +1,212 @@
+# The `research` agent preset: an agent whose one job is producing research
+# someone else can rely on.
+#
+# Installed here by @creait/dsh-research-mode, which copies this tree out of the
+# package into `<dsh home>/.agent-presets/research` when the harness boots. That
+# is a writable root, so this file is yours to edit — the plugin records what it
+# wrote and will not overwrite a copy you have changed.
+#
+# This is an AGENT-PLANE composition. The roster mounts it ONCE under a standing
+# scope and every session naming it joins by scope parentage. The host keeps what
+# a preset must not own: the registries, the sandbox and approval stack,
+# persistence and the model route.
+#
+# A row that PROVIDES a service MUST sit inside a group carrying an `isolate`
+# realm, or it publishes process-globally and `dsh-agent-presets` rejects the
+# mount. Exactly two groups below carry one, for exactly that reason.
+#
+# What is deliberately absent is as much the point as what is here. No shell: a
+# research agent has no reason to execute anything, and the sub-agents this
+# preset fans out inherit whatever it mounts. No `tool-workflow`: the model
+# writing its own orchestration script is the thing `deep_research` exists to
+# replace, and offering both invites it to improvise a worse loop. No skills and
+# no plan mode: there is one job here.
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a research agent powered by the {{model}} model, working in {{cwd}}.
+
+      Your job is to produce research someone can act on, and the standard for
+      that is not fluency — it is whether every claim traces to something you
+      actually read.
+
+      Reach for deep_research when the question needs several independent lines
+      of enquiry, current sources, or a written deliverable. It plans the topic
+      into sub-questions, researches them in parallel rounds, and reviews the
+      result against its own evidence. It also costs many agents and several
+      minutes, so it is the wrong tool for one fact, one definition, or one
+      current value — search for those yourself and answer directly.
+
+      Before a long run, make sure you are researching the right question. The
+      planner sees only the topic string you write, not this conversation, so put
+      the constraints into it: the decision behind the question, the versions,
+      jurisdictions or time window in scope, who the report is for. If the
+      request is genuinely ambiguous in a way that changes what gets researched,
+      ask first — a clarifying question costs a turn, and researching the wrong
+      question costs the whole run.
+
+      Report what the run actually covered. Every result carries its coverage:
+      how many planned questions were researched, and which were never answered
+      because the round budget ran out or a researcher failed. Those are holes in
+      the report, and they are invisible to the person reading it unless you say
+      so. Relay them. Offer to run the deferred questions rather than quietly
+      letting them go.
+
+      A report is evidence, not testimony. When you relay one, keep its hedges
+      and its conflicting sources intact — do not firm up a low-confidence claim
+      into a flat statement, and do not resolve a disagreement between sources
+      the report deliberately left open. If you assert something the research did
+      not establish, say plainly that it is your own inference.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── the research loop ───────────────────────────────────────────────────────
+
+# `workflowEngine` is per-preset on the Web surface: the host composition
+# disables `workflow-worker-thread`, and a Service row needs a realm anyway. The
+# realm is entry-local, so it is invisible to every sibling row OUTSIDE this
+# group — which is why the plugin's agent half sits INSIDE it. Mounted out
+# there it would resolve a host registry this composition never populates, and
+# the tool would register against an engine that does not exist.
+#
+# `tool-workflow` is deliberately not here. It is the general-purpose "write your
+# own orchestration" tool, and the whole argument for this mode is that a
+# research loop authored fresh on each call re-earns the same structural
+# mistakes each call. Add the row if you want both; you will get both.
+- id: research
+  name: cordis:group
+  group: true
+  isolate:
+    workflowEngine: true
+  config:
+    - id: workflow-worker-thread
+      name: '@deepseek-ai/dsh-workflow-worker-thread'
+      config:
+        provider: spawn
+        # The tool declares its own per-run ceiling from the round budget; this
+        # is the engine's backstop above it.
+        maxTotalAgents: 200
+        # `maxConcurrentAgents` is deliberately NOT set here, and that absence is
+        # load-bearing enough to be worth a comment.
+        #
+        # It caps agents PER RUN (`WorkflowExecution` is constructed per run), so
+        # it cannot express the thing that actually runs out: generation slots on
+        # a backend shared by every session on the machine. Two research runs at
+        # a cap of 3 are 6 concurrent generations, and a cap here has never seen
+        # your chat turns at all. Setting it means writing your deployment's
+        # capacity down a second time, in a file that ships with this plugin,
+        # where it will silently disagree with the first copy the day you change
+        # one of them.
+        #
+        # The real limit lives in @creait/dsh-gen-limit — global across sessions,
+        # edited in its settings page, and it makes a request WAIT for a slot
+        # rather than refusing it. A round of researchers paces itself against
+        # that, whatever its width. Leave this unset unless you are running
+        # without gen-limit, in which case it derives from CPU count and you
+        # should set it to what your backend serves.
+
+    - id: research-mode-tool
+      name: '@creait/dsh-research-mode/tool'
+      config:
+        # Defaults for a call that names neither. 3 rounds of 4 is twelve
+        # researched questions — enough for a real report without a fan-out
+        # nobody asked for.
+        rounds: 3
+        width: 4
+        # Ceilings the model cannot argue past, whatever it passes.
+        maxRounds: 6
+        maxWidth: 8
+        # The adversarial pass costs two agents and is the only stage that
+        # checks citations against the evidence. Leave it on.
+        review: true
+        language: English
+
+# ── reading the web ─────────────────────────────────────────────────────────
+
+# The `web` SERVICE and its providers stay in the host composition; only the
+# model-facing tool is per-agent. This row is also what gives the loop's child
+# agents their research tools — they are spawned onto this same composition, so
+# a preset that omits `tool-web` produces researchers that cannot research.
+#
+# `fetch: true` needs a fetch provider mounted on the host plane, which dsh does
+# not ship (see @creait/dsh-web-fetch, or `web.fetchProvider` in your profile).
+# Without one the tool still registers and every call fails with an unavailable
+# provider — and a research run that can only read search snippets is worth
+# considerably less than one that can open the page. Set it to false if you are
+# knowingly running without a provider.
+#
+# `fetchMaxOutputChars` bounds what one fetch puts in the window, but the cap is
+# applied to the SOURCE before turndown converts it rather than to the markdown
+# that comes out — so on HTML it is really a budget for pre-cleanup bytes, most
+# of which the converter was going to discard. At the 200,000 default a long
+# article arrives as its first third, flagged truncated, and the researcher
+# spends a lead chasing the rest of a page it already had. Doubling it roughly
+# doubles what survives; turndown compresses 5-10x, so the rendered markdown
+# still lands far below the cap and the cost is around 10k tokens on the few
+# pages big enough to need it. Note a `text/plain` body skips the converter and
+# can arrive at the full cap.
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: true
+    searchTimeoutMs: 60000
+    fetchMaxOutputChars: 400000
+
+# ── keeping the report ──────────────────────────────────────────────────────
+
+# Reading source material off disk, and writing the finished report somewhere it
+# survives the session. Registers into the host `tools` registry and provides
+# nothing, so it needs no realm; the `fs` service and its policy stay host-plane,
+# and the harness's approval stack still governs what lands.
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+# ── keeping the session alive ───────────────────────────────────────────────
+
+# A research report plus its coverage block is a large tool result, and two of
+# them will exhaust a window. `compaction-basic` resolves the pruner through
+# `ctx.get`, so the two share one entry-local realm. `tokenMeter` stays on the
+# host plane deliberately — it is keyed per session and the browser reads its
+# projection.
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    # A research report is the payload, not chatter: the default 8192-char
+    # threshold would prune the thing the run was for. The head budget here
+    # holds a whole report.
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 32768
+        headChars: 24576
+        tailChars: 4096
+
+# ── working through a list ──────────────────────────────────────────────────
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+# Scope questions are worth a turn before a run that costs minutes and a dozen
+# agents; this is what makes "ask first" in the persona something the agent can
+# actually do.
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'

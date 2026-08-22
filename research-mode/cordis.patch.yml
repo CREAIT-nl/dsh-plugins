@@ -1,0 +1,29 @@
+# @creait/dsh-research-mode bundle patch: inserts the ROSTER half into the
+# profile. Applied as a profile bundle layer (the `dsh.bundle.patch` manifest
+# field); activate with
+# `dsh plugin --profile <name> add @creait/dsh-research-mode`.
+#
+# This row injects no service and registers nothing the model can see. What it
+# does: installs the `research` agent preset into `<dsh home>/.agent-presets`,
+# registers the `dsh-research-mode` settings namespace (one key, `width`), and
+# serves the loopback route the composer's width control reads and writes. No
+# tool, no prompt section, no command — a normal session's system prompt and tool
+# catalog are unchanged, and the width control gates itself on the session's
+# preset, so it draws nothing outside research mode. The research loop lives in
+# the preset, which mounts this package's OTHER entry point
+# (`@creait/dsh-research-mode/tool`) inside its own `workflowEngine` realm.
+#
+# `config: { width: N }` seeds the pin as the composition default; the user's
+# setting overrides it. 0 (the default) means no pin — the model chooses the
+# width per call, bounded by the preset row's `maxWidth`.
+#
+# There is no "turn the tool on everywhere" switch here, and that is not an
+# oversight: the tool half injects `workflowEngine`, which the Web surface
+# disables on the host plane and mounts per preset. A row declaring it out here
+# would wait for a service this composition never publishes. To have
+# `deep_research` in another mode, add the tool row to that mode's preset, inside
+# a group carrying `isolate: { workflowEngine: true }` alongside a
+# `workflow-worker-thread` row — see `presets/research/agent.cordis.yml`.
+- insert:
+    - id: research-mode
+      name: '@creait/dsh-research-mode'
