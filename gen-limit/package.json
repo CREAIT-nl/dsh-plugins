@@ -1,0 +1,68 @@
+{
+  "name": "@creait/dsh-gen-limit",
+  "description": "Per provider/model concurrency limiter for generating sessions, with a themed settings card.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/config.js",
+    "lib/settings-routes.js",
+    "client/client.cjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "concurrency",
+    "rate-limit",
+    "subagent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git",
+    "directory": "gen-limit"
+  },
+  "homepage": "https://github.com/CREAIT-nl/dsh-plugins/tree/main/gen-limit#readme",
+  "bugs": {
+    "url": "https://github.com/CREAIT-nl/dsh-plugins/issues"
+  },
+  "author": "Francesco G <francesco@creait.nl>",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
