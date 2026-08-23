@@ -31,6 +31,12 @@ Each package installs on its own — you do not need the others:
 dsh plugin --profile web add @creait/dsh-hookkit
 ```
 
+Every package ships its own bundle patch, so that command mounts the row rather
+than only recording the dependency. Mounting is not the same as switching on:
+the two `ctx.web` providers register themselves and then wait to be pointed at
+something, and hookkit mounts with no hooks declared. Each README says which
+keys finish the job.
+
 ## Develop
 
 The packages resolve their dsh peer dependencies from the harness you have
@@ -48,7 +54,7 @@ done
 Then:
 
 ```sh
-pnpm test        # 517 tests across the seven packages
+pnpm test        # 531 tests across the seven packages
 ```
 
 Do not run `pnpm install` at the root — it would replace those symlinks with
