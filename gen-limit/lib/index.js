@@ -5,13 +5,13 @@
  * Host half. Two cooperating gates enforce a per provider/model cap on
  * generation (default -1 = unlimited):
  *
- *  1. `tools/pre-execute` — REJECT AT SPAWN. When an agent invokes a subagent
+ *  1. `tools/pre-execute` — WAIT AT SPAWN. When an agent invokes a subagent
  *     spawn tool (`subagent` / `subagent_fork`) while the target provider/model
- *     is already at capacity, the caller is denied immediately with a clear,
- *     actionable message ("finish the work yourself, or wait and retry"). No
- *     doomed child is launched, so the parent never sees the generic "failed
- *     before it finished" settlement. Admitted spawns reserve a slot that is
- *     released when the child settles.
+ *     is already at capacity, the spawn joins the same queue everything else
+ *     joins, so a fan-out is paced instead of half-refused. It is deliberately
+ *     an early hint and not a second count: the child that a spawn produces is
+ *     counted once, by gate 2, when it actually generates. Only a wait that
+ *     runs out of `queueTimeoutMs` denies the tool call.
  *
  *  2. `llm/stream` waterfall — HARD BACKSTOP. Every streaming model call is
  *     capped for DISTINCT sessions actually generating (a session reentering is
@@ -83,8 +83,6 @@ export function apply(ctx, config) {
     const resolve = () => resolveConfig(current());
     /** provider\0model -> Set<sessionId> of sessions currently generating. */
     const active = new Map();
-    /** provider\0model -> number of admitted-but-not-yet-settled subagent spawns. */
-    const reserved = new Map();
     let anon = 0;
 
     const KEY = (p, m) => p + '\u0000' + m;
@@ -100,36 +98,23 @@ export function apply(ctx, config) {
         return set === undefined ? 0 : set.size;
     }
 
-    function reservedCount(key) {
-        return reserved.get(key) ?? 0;
-    }
-
     function maxFor(key) {
         const limits = limitsMap(resolve().limits);
         return limits.has(key) ? limits.get(key) : -1;
     }
 
     /**
-     * The admission queue. It reads occupancy out of `active`/`reserved` rather
-     * than keeping its own count, so there is exactly one answer to "how busy is
+     * The admission queue. It reads occupancy out of `active` rather than
+     * keeping its own count, so there is exactly one answer to "how busy is
      * this model" and the settings UI can move the limit under a running queue.
      */
     const queue = makeSlotQueue({
         capacity: (key) => {
             const max = maxFor(key);
             if (max < 0) return { free: 0, unlimited: true };
-            return { free: max - (activeCount(key) + reservedCount(key)), unlimited: false };
+            return { free: max - activeCount(key), unlimited: false };
         },
     });
-
-    function changeReserved(key, delta) {
-        const next = Math.max(0, (reserved.get(key) ?? 0) + delta);
-        if (next === 0) reserved.delete(key);
-        else reserved.set(key, next);
-        // A freed reservation is a freed slot; whoever is waiting should get it
-        // before the next arrival does.
-        if (delta < 0) queue.release(key);
-    }
 
     /** The streaming backstop: hard cap on distinct concurrently-generating sessions. */
     const limiter = async function* (options, next) {
@@ -185,9 +170,22 @@ export function apply(ctx, config) {
     };
     ctx.on('llm/stream', limiter);
 
-    // Reject subagent spawns at capacity with a clear, actionable message.
-    // A reserved slot is released either when the child settles (subagent/end)
-    // or when the tool pipeline itself refuses allow (so we never leak).
+    // Pace subagent spawns against the same queue everything else waits in.
+    //
+    // This gate deliberately holds NO slot of its own. The obvious design is to
+    // reserve one here and release it when the child settles, so a spawn is
+    // "already counted" the moment it is admitted. That design double-counts:
+    // the child then takes a second slot from gate 2 the instant it generates,
+    // and every live child costs two, halving the effective limit. There is no
+    // clean seam to hand the reservation over either — `subagent/start` carries
+    // no back-reference to the spawn that caused it, and it also fires for
+    // children the workflow engine starts through `subagents.start()` without
+    // ever passing through a tool call.
+    //
+    // So the child is counted exactly once, by gate 2, where it is counted the
+    // same whichever way it was spawned. What is left here is a wait, not a
+    // count: at capacity a spawn blocks instead of piling another session onto
+    // a saturated backend, and it is released as soon as there is room.
     ctx.on('tools/pre-execute', async (exec, next) => {
         if (!SPAWN_TOOLS.has(exec.name)) return next();
         const agent = exec.agent;
@@ -199,13 +197,13 @@ export function apply(ctx, config) {
         const key = KEY(provider, model);
         const max = limits.has(key) ? limits.get(key) : -1;
         if (max < 0) return next();
-        const busy = activeCount(key) + reservedCount(key);
+        const busy = activeCount(key);
         const settings = resolve();
         try {
             // The stream limiter waits, so this must wait too. Left denying, a
             // spawn would be the only path that still loses work at capacity —
             // and the spawn is the expensive thing to have to redo.
-            await queue.acquire(key, () => { changeReserved(key, 1); }, {
+            await queue.acquire(key, () => {}, {
                 timeoutMs: settings.queueTimeoutMs,
                 maxQueued: settings.maxQueued,
                 signal: exec.signal,
@@ -215,30 +213,13 @@ export function apply(ctx, config) {
             if (!(error instanceof CapacityTimeout)) throw error;
             return { kind: 'deny', reason: String(error.message) };
         }
-        const decision = await next();
-        if (decision.kind !== 'allow') changeReserved(key, -1);
-        return decision;
-    });
-
-    // Release a reserved slot when a published child settles. `agents` is read
-    // as an optional service (not injected): it is required for precise release,
-    // but its absence must never block settlement or break the hard backstop.
-    ctx.on('subagent/end', (info) => {
-        try {
-            const agents = ctx.get('agents');
-            const child = agents?.get?.(info.id);
-            const provider = child?.options?.provider;
-            const model = child?.options?.model;
-            if (provider && model) changeReserved(KEY(provider, model), -1);
-        } catch {
-            /* best-effort release; never break settlement */
-        }
+        return next();
     });
 
     let onStats = () => [];
     const sync = () => {
         // Nothing re-registerable here; the gates read `resolve()` live and the
-        // route reads `active`/`reserved` live. But raising a limit in the UI
+        // route reads `active` live. But raising a limit in the UI
         // should free the requests already waiting on the old one, not just the
         // next arrivals — so the lines get re-pumped against the new numbers.
         queue.refresh();

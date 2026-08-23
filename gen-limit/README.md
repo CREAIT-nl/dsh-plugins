@@ -8,35 +8,41 @@ API has a financial one. dsh has no per-model concurrency control, so a single
 agent that fans out subagents can saturate either.
 
 This caps how many sessions may generate concurrently on a given
-provider/model, and refuses the overflow with an explanation the model can act
-on rather than a timeout it cannot.
+provider/model. Work past the cap **waits in a FIFO queue** rather than failing:
+a fan-out of eight researchers against a limit of three is a pacing problem, and
+bouncing five of them does not make the brief smaller, it just spends the retry
+budget re-asking.
 
 ## How it enforces
 
-Two gates, because one is not enough:
+**The count — `llm/stream` waterfall.** Every streaming model call is capped by
+the number of **distinct sessions actually generating**. A session reentering
+the loop is not counted twice, and a session parked waiting on a subagent holds
+no stream — the child is what counts. This is where the limit is enforced, and
+it is enforced the same way no matter how a session started: a subagent from a
+tool call, a child the workflow engine started directly, or a plain
+conversation.
 
-**1. `tools/pre-execute` — reject at spawn.** When an agent calls a subagent
-spawn tool (`subagent`, `subagent_fork`) and the target provider/model is
-already at capacity, the *caller* is denied outright:
+**The pacing — `tools/pre-execute`.** When an agent calls a subagent spawn tool
+(`subagent`, `subagent_fork`) and the target provider/model is already full, the
+spawn joins the same queue and is admitted as soon as there is room, so a
+fan-out is paced instead of piling more sessions onto a saturated backend.
 
-> Cannot spawn another subagent: `<provider>/<model>` already has 3 generation-capable
-> agents in flight (limit 3). This is temporary, not a permanent refusal: you may
-> poll for a free slot by waiting a few seconds and issuing the same spawn again,
-> repeating until it is admitted (a running session only has to finish for capacity
-> to return). If you would rather not wait, finish the current work yourself instead.
+This gate deliberately holds **no slot of its own**. Reserving one per admitted
+spawn is the obvious design and it double-counts: the child then takes a second
+slot the instant it generates, so every live child costs two. There is no clean
+seam to hand a reservation over either — `subagent/start` carries no
+back-reference to the spawn that caused it, and it also fires for children the
+workflow engine starts without any tool call. So a child is counted exactly
+once, where it can be counted consistently.
 
-No doomed child is launched, so the parent never sees the generic "failed before
-it finished" settlement and has no idea capacity was the reason. Admitted spawns
-reserve a slot, released when the child settles (`subagent/end`).
-
-**2. `llm/stream` waterfall — hard backstop.** Every streaming model call is
-capped by the number of **distinct sessions actually generating**. A session
-reentering the loop is not counted twice, and a session parked waiting on a
-subagent holds no stream — the child is what counts. This enforces the true
-ceiling no matter how a session started, and catches anything that races past
-the spawn gate.
-
-Rejections carry the code `GEN_CAPACITY_EXCEEDED`.
+**What a wait costs.** `queueTimeoutMs` bounds how long a request waits (`0`
+waits indefinitely) and `maxQueued` bounds how many may wait at once — an
+unbounded queue in front of a slow backend is a memory leak that presents as a
+hang. Only a request that exhausts its wait fails, and it fails with the code
+`GEN_CAPACITY_EXCEEDED`; for a spawn that means the tool call is denied.
+Reaching that point means the backend has been saturated for a sustained
+period, not that a request was unlucky with timing.
 
 ## Install
 
@@ -60,6 +66,8 @@ to unlimited** — the plugin is inert until you give it a limit.
     limits:
       - { provider: dgx1, model: deepseek-v4-flash, max: 2 }
       - { provider: anthropic, model: claude-opus-4, max: 1 }
+    queueTimeoutMs: 120000   # how long a request waits for a slot; 0 = forever
+    maxQueued: 64            # how many may wait at once
 ```
 
 Or edit it in the GUI: **设置面板 → 插件 → 插件配置 → Generation Concurrency**.
@@ -80,8 +88,8 @@ which a plugin cannot widen:
 
 ## What breaks this
 
-`llm/stream`, `tools/pre-execute` and `subagent/end` are pre-1.0 internal seams
-with no compatibility guarantee. `peerDependencies` pins the versions this was
+`llm/stream` and `tools/pre-execute` are pre-1.0 internal seams with no
+compatibility guarantee. `peerDependencies` pins the versions this was
 built against; a harness upgrade can move them.
 
 The settings nav glyph is a deliberate reach past the API. `settings.section`

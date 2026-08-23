@@ -10,10 +10,9 @@
  * budget re-asking. So capacity is now something a request WAITS for.
  *
  * What this module does NOT own is the count. Occupancy lives in the limiter's
- * `active` (session ids, so one session generating ten times in a row is one)
- * and `reserved` (admitted-but-not-yet-started spawns) maps, and this queue
- * reads them through the `capacity` probe it is given. It owns only the line:
- * who is waiting, in what order, and what ends their wait.
+ * `active` map (session ids, so one session generating ten times in a row is
+ * one), and this queue reads it through the `capacity` probe it is given. It
+ * owns only the line: who is waiting, in what order, and what ends their wait.
  *
  * Three things end a wait, and all three are bounded on purpose:
  *   - a slot frees        -> the head of the line claims it, synchronously
@@ -83,8 +82,9 @@ export function makeSlotQueue(options) {
 		 * invisible to the next capacity probe.
 		 *
 		 * @param key - provider/model key.
-		 * @param claim - runs at admission to take the slot (adds the session,
-		 *   or increments the reservation). Must be synchronous.
+		 * @param claim - runs at admission to take the slot (adds the session).
+		 *   A waiter that only wants to be paced, and takes no slot of its own,
+		 *   passes a no-op. Must be synchronous.
 		 * @param waitOptions - `{ timeoutMs, maxQueued, signal, message }`.
 		 * @returns a promise that resolves on admission.
 		 * @throws {CapacityTimeout} when the wait times out or the line is full.

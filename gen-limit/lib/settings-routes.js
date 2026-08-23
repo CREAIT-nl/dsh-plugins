@@ -215,10 +215,10 @@ export function makeSettingsRoutes(ctx, resolve, activeThunk, llm, queue) {
                 if (req.method !== 'GET') { writeJson(res, 405, { error: 'method not allowed' }); return; }
                 const entries = [];
                 const map = activeThunk();
-                // Union of the two, not just the busy ones: a model can be all
-                // reserved-not-yet-streaming with a line behind it, and a queue
-                // depth that only appears once something is already streaming
-                // would hide exactly the state worth seeing.
+                // Union of the two, not just the busy ones: a model can have
+                // a line waiting on a limit that was just lowered under it, and
+                // a queue depth that only appears once something is already
+                // streaming would hide exactly the state worth seeing.
                 const keys = new Set(map.keys());
                 for (const key of queue?.keys?.() ?? []) keys.add(key);
                 for (const key of keys) {
