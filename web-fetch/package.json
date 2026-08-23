@@ -1,6 +1,6 @@
 {
   "name": "@creait/dsh-web-fetch",
-  "description": "Guarded local fetch provider for the DeepSeek Harness web capability seam (ctx.web) \u2014 the backend dsh's shipped web_fetch tool is missing",
+  "description": "Guarded local fetch provider for the DeepSeek Harness web capability seam (ctx.web) — the backend dsh's shipped web_fetch tool is missing",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -15,8 +15,14 @@
   },
   "files": [
     "lib/index.js",
-    "lib/addr.js"
+    "lib/addr.js",
+    "cordis.patch.yml"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "license": "MIT",
   "engines": {
     "node": ">=20"

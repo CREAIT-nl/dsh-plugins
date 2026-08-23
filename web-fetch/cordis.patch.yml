@@ -1,0 +1,39 @@
+# @creait/dsh-web-fetch bundle patch: inserts the provider row into the profile
+# roster. Applied as a profile bundle layer (the `dsh.bundle.patch` manifest
+# field); activate with `dsh plugin --profile <name> add @creait/dsh-web-fetch`.
+#
+# The row registers the guarded `local` fetch provider with `ctx.web` and does
+# nothing else — no tool, no prompt section, nothing the model can see. dsh
+# ships no fetch provider of its own, so `local` is normally the only one
+# registered and the seam selects it without being told. Name it explicitly
+# only if something else registers a second one:
+#
+#   - id: web
+#     config:
+#       fetchProvider: local
+#
+# What this row does NOT do is expose `web_fetch`. That tool belongs to
+# `tool-web`, which dsh-base mounts with `fetch: false` — and on the web surface
+# the model-facing copy is mounted per agent preset, so the host-plane row is
+# disabled there. Turning the tool on is a decision about your composition, not
+# one a package should make on your behalf:
+#
+#   - id: tool-web
+#     disabled: false
+#     config: { search: false, fetch: true }
+#
+# Guard settings go on this row in your own profile patch, applied after this
+# layer and assigning `config` outright. `allowHosts` is the deliberate opt-out
+# that lets the provider reach a private address it would otherwise refuse:
+#
+#   - id: web-fetch
+#     config:
+#       allowHosts: ['searxng.lan']
+#
+# If you already insert this row by hand, drop that block. `insert` appends
+# unconditionally — the loader does not dedupe by id — and a second row would
+# register the same provider id twice, which `ctx.web` rejects outright with
+# WEB_DUPLICATE_PROVIDER.
+- insert:
+    - id: web-fetch
+      name: '@creait/dsh-web-fetch'

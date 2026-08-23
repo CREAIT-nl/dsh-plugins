@@ -26,23 +26,47 @@ limits, and unsupported content types."* This package is that provider.
 dsh plugin --profile web add @creait/dsh-web-fetch
 ```
 
-Then point the seam at it and turn the tool on, in your profile patch:
+That mounts the provider and registers it with `ctx.web`. It does not turn on
+`web_fetch`: the tool belongs to `tool-web`, which dsh-base mounts with
+`fetch: false` because no provider shipped. Turn it on in your profile patch:
+
+```yaml
+- id: tool-web
+  config:
+    fetch: true
+```
+
+Restart `dsh` — the boot manifest is assembled at startup.
+
+Nothing has to name the provider. dsh ships none of its own, so `local` is the
+only fetch provider registered and the seam selects it on that basis. Name it
+explicitly only if something else registers a second one, which is when the
+seam refuses to guess:
 
 ```yaml
 - id: web
   config:
     fetchProvider: local
-
-- id: tool-web
-  config:
-    fetch: true
-
-- insert:
-    - id: web-fetch
-      name: '@creait/dsh-web-fetch'
 ```
 
-Restart `dsh` — the boot manifest is assembled at startup.
+Under `dsh web`, `fetch: true` on that row is not enough on its own:
+`dsh-web-app` disables the host-plane `tool-web`, and each agent preset mounts
+its own copy with `fetch: false`. Revive the host row instead of forking every
+preset, and give it only the half the presets do not own — the tool registry
+throws on a duplicate tool name:
+
+```yaml
+- id: tool-web
+  disabled: false
+  config:
+    search: false
+    fetch: true
+```
+
+If you installed this before it shipped a bundle patch, your profile patch
+inserts the row by hand. Drop that `- insert:` block: `insert` appends
+unconditionally, and the second row would register the same provider id twice,
+which `ctx.web` rejects with `WEB_DUPLICATE_PROVIDER`.
 
 ## Guards
 
