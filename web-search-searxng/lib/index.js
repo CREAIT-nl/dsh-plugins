@@ -18,12 +18,19 @@ import { WebError } from '@deepseek-ai/dsh-web';
 const SEARXNG_PROVIDER_ID = 'searxng';
 
 /**
- * Default SearXNG instance base URL (no trailing slash): the port the
- * `searxng/searxng` image listens on. Set `baseURL` in the plugin config to
- * point at your own instance — this default only spares a purely local setup
- * from needing one.
+ * Default SearXNG instance base URL: none.
+ *
+ * Empty is deliberate, and it is what lets this package ship a bundle patch. A
+ * provider carrying a usable default comes up available the moment it is
+ * installed, and `ctx.web` throws `WEB_PROVIDER_AMBIGUOUS` when two usable
+ * search providers are registered and no `searchProvider` names one — so
+ * installing this to see what it does would have broken the search that was
+ * already working. Unconfigured, `available()` is false and the shipped
+ * provider keeps serving. Set `baseURL` (no trailing slash; the
+ * `searxng/searxng` image listens on http://localhost:8080) and the row wakes
+ * up.
  */
-const SEARXNG_DEFAULT_BASE_URL = 'http://localhost:8080';
+const SEARXNG_DEFAULT_BASE_URL = '';
 
 /** Default number of results requested from SearXNG. */
 const SEARXNG_DEFAULT_MAX_RESULTS = 10;

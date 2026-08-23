@@ -1,0 +1,38 @@
+# @creait/dsh-web-search-searxng bundle patch: inserts the provider row into the
+# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field); activate with
+# `dsh plugin --profile <name> add @creait/dsh-web-search-searxng`.
+#
+# Installed and unconfigured, this row is inert by design: `baseURL` defaults to
+# the empty string, the provider reports itself unavailable, and `ctx.web` goes
+# on selecting the shipped DeepSeek provider exactly as it did before. That is
+# what makes a bundle mount safe here. The seam throws WEB_PROVIDER_AMBIGUOUS
+# when two usable search providers are registered and nothing named one, so a
+# provider that switched itself on at install would break `web_search` for
+# anyone who installed it to see what it does.
+#
+# Two keys turn it on, both in your own profile patch, which is applied after
+# this layer and assigns `config` outright:
+#
+#   - id: web
+#     config:
+#       searchProvider: searxng
+#
+#   - id: web-search-searxng
+#     config:
+#       baseURL: http://localhost:8080   # your SearXNG instance
+#       maxResults: 10
+#       engines: bing,google,wikipedia
+#
+# Naming the provider is what resolves the ambiguity, so the shipped
+# `web-search-deepseek` row may stay mounted. Disabling it
+# (`- id: web-search-deepseek` / `disabled: true`) is a separate decision about
+# whether to keep the native route registered at all.
+#
+# If you already insert this row by hand, drop that block. `insert` appends
+# unconditionally — the loader does not dedupe by id — and a second row would
+# register the same provider id twice, which `ctx.web` rejects outright with
+# WEB_DUPLICATE_PROVIDER.
+- insert:
+    - id: web-search-searxng
+      name: '@creait/dsh-web-search-searxng'

@@ -10,9 +10,10 @@ seam. It replaces the stock DeepSeek search route, so the model-facing
 dsh plugin --profile web add @creait/dsh-web-search-searxng
 ```
 
-That records the dependency and symlinks it into the profile. It does **not**
-activate the provider: this package declares no `dsh.bundle`, so it never joins
-the profile's layer stack. Activation lives in your profile patch —
+That mounts the provider — and mounting it changes nothing yet. `baseURL` has
+no default, so an unconfigured row reports itself unavailable and `ctx.web` goes
+on selecting the shipped DeepSeek provider exactly as it did before. Two keys
+switch the search over, in your profile patch —
 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`, where `$DSH_HOME` defaults to
 `~/.dsh`:
 
@@ -21,20 +22,33 @@ the profile's layer stack. Activation lives in your profile patch —
   config:
     searchProvider: searxng
 
-- id: web-search-deepseek
-  disabled: true
-
-- insert:
-    - id: web-search-searxng
-      name: '@creait/dsh-web-search-searxng'
-      config:
-        baseURL: http://localhost:8080   # your SearXNG instance
-        maxResults: 10
-        engines: bing,google,wikipedia
+- id: web-search-searxng
+  config:
+    baseURL: http://localhost:8080   # your SearXNG instance
+    maxResults: 10
+    engines: bing,google,wikipedia
 ```
 
-All three rows are required — drop any one and the provider goes inert or
-`ctx.web` ends up with two usable providers and throws `WEB_PROVIDER_AMBIGUOUS`.
+Both are required, and they fail differently. Without `baseURL` the provider
+stays unavailable, so naming it costs you every search with
+`WEB_PROVIDER_CONFIGURED_UNAVAILABLE`. Without `searchProvider` two usable
+providers are registered and nothing chose between them, which is
+`WEB_PROVIDER_AMBIGUOUS`.
+
+Disabling the shipped provider is a separate decision: naming one in
+`searchProvider` is what resolves the ambiguity, so `web-search-deepseek` can
+stay mounted as a fallback you can switch back to by editing one line.
+
+```yaml
+- id: web-search-deepseek
+  disabled: true
+```
+
+If you installed this before it shipped a bundle patch, your profile patch
+inserts the row by hand. Drop that `- insert:` block and keep the
+`- id: web-search-searxng` config override above: `insert` appends
+unconditionally, and a second row would register the same provider id twice,
+which `ctx.web` rejects with `WEB_DUPLICATE_PROVIDER`.
 
 ### How the peers resolve
 
@@ -60,7 +74,7 @@ service identity. That is what `peerDependencies` is preventing.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `baseURL` | `http://localhost:8080` | SearXNG instance, trailing slashes stripped |
+| `baseURL` | none | SearXNG instance, trailing slashes stripped. Empty means unavailable: the row mounts, the seam ignores it |
 | `maxResults` | `10` | Sources returned; reached by paging, see below |
 | `maxPages` | `3` | Ceiling on result pages fetched for one search |
 | `engines` | `''` | Comma-separated engine pin, e.g. `bing,google` |

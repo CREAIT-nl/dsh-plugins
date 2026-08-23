@@ -50,7 +50,11 @@ describe('resolveOptions', () => {
 });
 
 describe('buildSearchUrl', () => {
-	const options = resolveOptions({});
+	// A URL can only be built against an instance, and `baseURL` has no default:
+	// an unconfigured provider reports itself unavailable and is never asked to
+	// search, which is what keeps a bundle-mounted row from making the seam
+	// ambiguous.
+	const options = resolveOptions({ baseURL: 'http://searxng.test' });
 
 	it('asks for JSON and carries the query', () => {
 		const url = buildSearchUrl(options.baseURL, { query: 'sparse autoencoders' }, options);
@@ -69,6 +73,7 @@ describe('buildSearchUrl', () => {
 
 	it('sends the filters once they are configured', () => {
 		const configured = resolveOptions({
+			baseURL: 'http://searxng.test',
 			categories: 'science',
 			language: 'en',
 			engines: 'bing,google',
@@ -212,9 +217,14 @@ describe('SearxngSearchProvider.search', () => {
 	 * Drive the provider against canned pages. Each entry is one page body, in
 	 * order; the stub records the URLs asked for so paging can be asserted.
 	 */
+	// `baseURL` has no default — that is what keeps an unconfigured row from
+	// making `ctx.web` ambiguous — so a provider that searches at all is one that
+	// was pointed at an instance. Tests that care about the URL override it.
+	const INSTANCE = 'http://searxng.test';
+
 	function providerOver(pages, config = {}) {
 		const asked = [];
-		const provider = new SearxngSearchProvider(() => resolveOptions(config));
+		const provider = new SearxngSearchProvider(() => resolveOptions({ baseURL: INSTANCE, ...config }));
 		provider.fetchPage = async (url) => {
 			asked.push(url);
 			return mapSearxngResponse(pages[asked.length - 1] ?? { results: [] });
