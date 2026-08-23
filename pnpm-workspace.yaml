@@ -4,3 +4,4 @@ packages:
   - 'web-search-searxng'
   - 'web-fetch'
   - 'research-mode'
+  - 'think-level'

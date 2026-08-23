@@ -1,0 +1,18 @@
+# @creait/dsh-think-level bundle patch: inserts the row into the profile.
+# Applied as a profile bundle layer (the `dsh.bundle.patch` manifest field);
+# activate with `dsh plugin --profile <name> add @creait/dsh-think-level`.
+#
+# The row injects no service and registers nothing the model can see. What it
+# does: registers the `dsh-think-level` settings namespace (one key, `defaults`,
+# a provider/model -> reasoning effort table), serves the loopback routes the
+# Settings page and the composer pill read, and installs ONE `agent/request`
+# listener that fills in a reasoning effort when nothing else chose one.
+#
+# `dsh.client` makes the browser half load alongside it: the "Thinking Level"
+# Settings page and the effort pill in the composer's tool row.
+#
+# `config: { defaults: [{ provider, model, effort }] }` seeds the table as the
+# composition default; the user's setting overrides it.
+- insert:
+    - id: think-level
+      name: '@creait/dsh-think-level'

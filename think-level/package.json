@@ -1,0 +1,72 @@
+{
+  "name": "@creait/dsh-think-level",
+  "description": "Thinking level for DeepSeek Harness: a per provider/model default reasoning effort that also reaches subagents, plus one composer pill to change it for the session.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/config.js",
+    "lib/global-default.js",
+    "lib/pi-ai-levels.js",
+    "lib/settings-routes.js",
+    "client/client.cjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-model-selection"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "reasoning",
+    "reasoning-effort",
+    "thinking",
+    "model-defaults"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git",
+    "directory": "think-level"
+  },
+  "homepage": "https://github.com/CREAIT-nl/dsh-plugins/tree/main/think-level#readme",
+  "bugs": {
+    "url": "https://github.com/CREAIT-nl/dsh-plugins/issues"
+  },
+  "author": "Francesco G <francesco@creait.nl>"
+}
