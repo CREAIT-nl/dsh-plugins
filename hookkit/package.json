@@ -16,8 +16,14 @@
   "files": [
     "lib/index.js",
     "lib/config.js",
-    "lib/handlers.js"
+    "lib/handlers.js",
+    "cordis.patch.yml"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "license": "MIT",
   "engines": {
     "node": ">=20"

@@ -29,13 +29,24 @@ in-process, so there is no second process and no second MCP handshake per turn.
 dsh plugin --profile web add @creait/dsh-hookkit
 ```
 
+That mounts the engine with no hooks, which costs nothing on any seam: `apply`
+returns before it registers a listener while the list is empty. Declaring the
+hooks is the whole of the configuration, and it happens on the row, in your
+profile patch — `$DSH_HOME/profiles/<profile>/cordis.patch.yml`, where
+`$DSH_HOME` defaults to `~/.dsh`:
+
 ```yaml
-- insert:
-    - id: hookkit
-      name: '@creait/dsh-hookkit'
-      config:
-        hooks: [...]
+- id: hookkit
+  config:
+    hooks: [...]
 ```
+
+Restart `dsh` — the boot manifest is assembled at startup.
+
+If you installed this before it shipped a bundle patch, your profile patch
+inserts the row by hand. Drop that `- insert:` block: `insert` appends
+unconditionally, so the hand-written row and the bundle's would both mount and
+every hook would fire twice.
 
 ## Anatomy of a hook
 

@@ -1,0 +1,32 @@
+# @creait/dsh-hookkit bundle patch: inserts the engine row into the profile
+# roster. Applied as a profile bundle layer (the `dsh.bundle.patch` manifest
+# field); activate with `dsh plugin --profile <name> add @creait/dsh-hookkit`.
+#
+# The row mounts with NO hooks. `hooks` defaults to the empty list and `apply`
+# returns before it registers a single listener, so an installed-but-undeclared
+# hookkit costs nothing on any seam — which is what makes it safe to mount from
+# a bundle. Declaring the hooks is the whole of the configuration, and it
+# happens in your own profile patch, applied after this layer and assigning
+# `config` outright:
+#
+#   - id: hookkit
+#     config:
+#       hooks:
+#         - id: mem0-recall
+#           on: agent/pre-step
+#           when: { firstStep: true, firstTurn: true }
+#           do:
+#             tool: mcp__mem0__search_memory
+#             arguments: { query: '{{conversationTail}}' }
+#           inject: { as: context, maxChars: 2500 }
+#
+# `inject: ['tools', 'shell']` gates the row rather than probing for those
+# services: the loader waits for both before `apply` runs, so a composition that
+# publishes neither never registers hooks that would no-op on the first turn.
+#
+# If you already insert this row by hand, drop that block when you add the
+# package as a bundle. `insert` appends unconditionally — the loader does not
+# dedupe by id — so both rows would mount and every hook would fire twice.
+- insert:
+    - id: hookkit
+      name: '@creait/dsh-hookkit'

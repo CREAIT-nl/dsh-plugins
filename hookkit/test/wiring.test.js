@@ -4,9 +4,48 @@
  * plugins lack — a hook contributing model-visible context.
  */
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-import { Config, apply } from '../lib/index.js';
+import { Config, apply, name } from '../lib/index.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (path) => readFileSync(join(ROOT, path), 'utf8');
+const manifest = JSON.parse(read('package.json'));
+
+describe('the package manifest', () => {
+	it('ships every file it lists', () => {
+		for (const file of manifest.files) assert.ok(existsSync(join(ROOT, file)), `listed but missing: ${file}`);
+	});
+
+	// Without this the package installs and mounts nothing: `dsh plugin add`
+	// records the dependency, and only a `dsh.bundle` manifest field makes the
+	// profile apply the patch that inserts the row.
+	it('points the harness at its bundle patch, and publishes it', () => {
+		assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
+		assert.ok(manifest.files.includes('cordis.patch.yml'), 'the patch would not be published');
+	});
+
+	it('is named as the row the bundle patch inserts', () => {
+		const patch = read('cordis.patch.yml');
+		assert.match(patch, new RegExp(`name: '${manifest.name.replace('/', '\\/')}'`));
+		assert.match(patch, /id: hookkit/);
+		assert.equal(name, 'hookkit');
+	});
+
+	// The bundle mounts this row for anyone who installs the package, so an
+	// undeclared engine has to be free. `apply` returning before it registers a
+	// listener is what makes that true, and the empty default is what gets it
+	// there.
+	it('costs nothing when the bundle mounts it undeclared', () => {
+		const ctx = stubContext();
+		apply(ctx, new Config({}));
+		assert.deepEqual(new Config({}).hooks, []);
+		assert.equal(ctx.listeners.size, 0);
+	});
+});
 
 /** A minimal Cordis-shaped context recording its listeners. */
 function stubContext({ toolResult, shellResult } = {}) {
