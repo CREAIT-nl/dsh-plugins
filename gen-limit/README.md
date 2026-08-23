@@ -60,17 +60,21 @@ Limits live in the `dsh-gen-limit` settings namespace, one row per
 provider/model. **`max: -1` means unlimited, and any pair without a row defaults
 to unlimited** — the plugin is inert until you give it a limit.
 
+Seed them from the row in your profile patch — `provider` and `model` are
+whatever ids your own routes publish:
+
 ```yaml
 - id: gen-limit
   config:
     limits:
-      - { provider: dgx1, model: deepseek-v4-flash, max: 2 }
+      - { provider: local-gpu, model: deepseek-v4-flash, max: 2 }
       - { provider: anthropic, model: claude-opus-4, max: 1 }
     queueTimeoutMs: 120000   # how long a request waits for a slot; 0 = forever
     maxQueued: 64            # how many may wait at once
 ```
 
-Or edit it in the GUI: **设置面板 → 插件 → 插件配置 → Generation Concurrency**.
+Or edit it in the GUI: **Settings → Plugins → Plugin config → Generation
+Concurrency** (the shipped web UI labels those **设置面板 → 插件 → 插件配置**).
 The card lists the live providers and models from the same `llm` service the
 conversation uses, so the rows are pickable rather than typed from memory.
 

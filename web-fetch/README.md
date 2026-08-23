@@ -77,7 +77,7 @@ network — a LAN wiki, an internal dashboard:
 ```yaml
 - id: web-fetch
   config:
-    allowHosts: ['dgx1', 'wiki.lan']
+    allowHosts: ['wiki.lan', 'dashboard.lan']
 ```
 
 ## Known limitation: DNS rebinding

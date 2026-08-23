@@ -93,9 +93,11 @@ change: editing the level itself never triggers it, and the first render of a
 session never overwrites a level that is already set, so a level you picked by
 hand survives both a model switch and a page reload.
 
-**The local fork.** If you use the local `dsh-model-picker` fork, its own effort
-dropdown and its `defaultEffort` pinning are removed — see that fork's
-`LOCAL.md`. Exactly one effort control should exist.
+**Any third-party picker.** A community model picker may ship an effort dropdown
+of its own and pin `defaultEffort` the same way on every model change. Two
+controls over one session field is confusing enough by itself, but the pinning is
+the real problem: a field that is always set leaves the table no hole to fill. If
+yours has one, cut it — exactly one effort control should exist.
 
 **The harness itself**, which is the one you cannot see. `selectModel` resolves
 your switch through `llm.resolveCallConfig`, which materialises the adapter's own
@@ -126,10 +128,10 @@ Stored under the `dsh-think-level` settings namespace:
 ```yaml
 dsh-think-level:
   defaults:
-    - provider: dgx
+    - provider: local-gpu
       model: deepseek-v4-flash
       effort: high
-    - provider: pi-ai
+    - provider: openrouter
       model: gpt-5.2
       effort: low
 ```
@@ -154,7 +156,7 @@ one writes the standard five for that model:
 ```yaml
 llm-pi-ai:
   providers:
-    dgx:
+    local-gpu:
       models:
         - id: deepseek-v4-flash
           reasoningEfforts:
