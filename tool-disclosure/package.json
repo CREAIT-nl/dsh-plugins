@@ -1,0 +1,72 @@
+{
+  "name": "@creait/dsh-tool-disclosure",
+  "description": "Progressive tool disclosure for DeepSeek Harness: rarely-used tool groups cost one catalog line instead of their full schemas until the model loads them with tool_search.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./catalog": {
+      "default": "./lib/catalog.js"
+    },
+    "./client": "./client/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/catalog.js",
+    "lib/settings-routes.js",
+    "client/client.cjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "tools",
+    "context",
+    "progressive-disclosure",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git",
+    "directory": "tool-disclosure"
+  },
+  "homepage": "https://github.com/CREAIT-nl/dsh-plugins/tree/main/tool-disclosure#readme",
+  "bugs": {
+    "url": "https://github.com/CREAIT-nl/dsh-plugins/issues"
+  },
+  "author": "Francesco G <francesco@creait.nl>",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

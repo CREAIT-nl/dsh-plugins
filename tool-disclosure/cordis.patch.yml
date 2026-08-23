@@ -1,0 +1,27 @@
+# dsh-tool-disclosure bundle patch: inserts the host-side plugin row into the
+# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field) over dsh-base; activate with
+#   dsh plugin --profile web add link:<path-to-this-package>
+#
+# The row mounts deferring nothing, so it registers no tool of its own and
+# costs nothing until it is asked. Every tool the registry holds already has a
+# group — an MCP server's tools under the server's name, everything else on its
+# own — so switching one on in Settings is all it takes. What the deployment
+# adds in its own profile patch is `defer`, to ship a decision rather than wait
+# for someone to make it, and `groups`, to give one of those groups a better id
+# and a summary written for the model:
+#
+#   - id: tool-disclosure
+#     config:
+#       defer: ['browser']
+#       groups:
+#         - id: browser
+#           match: ['mcp__playwright__*']
+#           summary: 'Drive a real Chrome: open a URL, click, fill forms, …'
+#
+# The `dsh.client` declaration in package.json makes the browser half (exports
+# "./client", served at /plugins/@creait/dsh-tool-disclosure/client.js) load in
+# the web GUI — the Settings page with one switch per group.
+- insert:
+    - id: tool-disclosure
+      name: '@creait/dsh-tool-disclosure'
