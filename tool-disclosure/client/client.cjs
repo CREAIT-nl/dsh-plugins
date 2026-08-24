@@ -36,6 +36,16 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
 
+    // A platform seed module, resolvable exactly like `react` — no `inject`
+    // entry, no `dsh.client.external`, no dependency. It is what the harness's
+    // own settings pages are built from. Guarded anyway: a shell that ever
+    // stopped seeding it should cost this page its pills, not its content.
+    let P = {}
+    try { P = require('@deepseek-ai/dsh-client-ui-primitives') || {} } catch (error) { P = {} }
+    const Pill = P.Pill || function (props) {
+      return h('span', { className: 'td-pill' + (props.className ? ' ' + props.className : '') }, props.children)
+    }
+
     const NS = 'dsh-tool-disclosure'
     const CONFIG_ROUTE = '/api/dsh-tool-disclosure/config'
     const GROUPS_ROUTE = '/api/dsh-tool-disclosure/groups'
@@ -113,46 +123,56 @@ window.__ModuleLoader__.load({
     }
 
     // ---------------------------------------------------------------- styles
+    // The settings shell already supplies the page's padding and draws no card
+    // of its own, so neither does this: a bordered box inside `.options` reads
+    // as a foreign widget dropped onto the page, and its right edge clips the
+    // descriptions. Everything below is the harness's own grammar — the row
+    // metrics come from `dsh-client-ui-permission-presets/PermissionRow`, the
+    // heading pair from its plugins page. Every token used exists; none of them
+    // needs a fallback chain.
     const CSS =
-      '.td-card{list-style:none;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-bg-layer-2));border-radius:12px}' +
-      '.td-head{align-items:center;gap:12px;padding:14px 16px;display:flex}' +
-      '.td-headtext{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}' +
-      '.td-name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}' +
-      '.td-desc{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:13px;line-height:1.5}' +
-      '.td-body{border-top:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));margin:0 16px;padding:12px 0 8px}' +
-      '.td-muted{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));margin:0 0 10px;font-size:12px;line-height:1.5}' +
-      '.td-sub{color:var(--dsw-alias-label-secondary);font-size:13px;font-weight:600;line-height:1.5;margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1))}' +
-      '.td-sub:first-child{margin-top:0;padding-top:0;border-top:0}' +
-      '.td-row{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1))}' +
-      '.td-row:last-child{border-bottom:0}' +
-      '.td-rowtext{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}' +
-      '.td-id{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600;line-height:1.5}' +
-      '.td-summary{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}' +
-      '.td-names{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;word-break:break-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}' +
-      '.td-cost{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:12px;line-height:1.5}' +
+      '.td-section{max-width:760px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:12px}' +
+      '.td-heading{margin:0;font-size:18px;font-weight:600;line-height:26px}' +
+      '.td-intro{margin:0;font-size:13px;line-height:1.5;color:var(--dsw-alias-label-tertiary)}' +
+      '.td-note{margin:0;font-size:12px;font-weight:400;line-height:18px;color:var(--dsw-alias-label-tertiary)}' +
+      '.td-alert{margin:0;font-size:12px;font-weight:400;line-height:18px;color:var(--dsw-alias-state-error-primary)}' +
+      '.td-sub{margin:8px 0 0;font-size:14px;font-weight:600;line-height:22px;color:var(--dsw-alias-label-primary)}' +
+      '.td-rows{display:flex;flex-direction:column}' +
+      '.td-row{display:flex;align-items:center;gap:8px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}' +
+      '.td-rows>.td-row:last-child{border-bottom:none}' +
+      '.td-rowtext{display:flex;flex-direction:column;flex:1;gap:4px;min-width:0;padding-right:48px}' +
+      '.td-title{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:400;line-height:22px}' +
+      '.td-desc{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400;line-height:18px}' +
+      // Clamped, with the whole thing on hover: the summary is written for the
+      // model, and at full length it pushes the switch it belongs to off the
+      // first screenful. Same for the names of a 24-tool server.
+      '.td-summary{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400;line-height:18px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}' +
+      '.td-names{color:var(--dsw-alias-label-tertiary);font-family:var(--ds-font-family-code);font-size:12px;line-height:18px;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}' +
+      '.td-cost{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400;line-height:18px}' +
       '.td-cost b{font-weight:600;font-variant-numeric:tabular-nums}' +
-      // Traced from the shell's own switch rather than approximated: same 36x20
-      // track, same 14px thumb, same 16px travel, same tokens throughout. The
-      // ON state is where an approximation shows — a white thumb and a
-      // border-less track read as a different control sitting one page away
-      // from the real ones, and on the olive theme the white also fights the
-      // fill it sits on. bg-layer-3 is what the shipped switch puts there.
-      '.td-switch{appearance:none;flex:none;cursor:pointer;box-sizing:border-box;width:36px;height:20px;margin-top:2px;padding:0;border-radius:10px;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));background:var(--dsw-alias-bg-layer-1);position:relative;transition:background .16s,border-color .16s}' +
-      '.td-switch:hover:not(:disabled){border-color:var(--dsw-alias-label-dimmed,var(--dsw-alias-label-tertiary))}' +
-      '.td-switch:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary));outline-offset:2px}' +
-      '.td-switch:disabled{cursor:default;opacity:.55}' +
-      '.td-switch[aria-checked="true"]{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary));border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary))}' +
-      '.td-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .16s,background .16s}' +
-      '.td-switch[aria-checked="true"] .td-knob{transform:translateX(16px);background:var(--dsw-alias-bg-layer-3,#fff)}' +
-      '.td-stats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}' +
-      '.td-stat{flex:1 1 120px;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-1)}' +
-      '.td-stat-label{display:block;color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:11px;line-height:1.5}' +
-      '.td-stat-value{display:block;color:var(--dsw-alias-label-primary);font-size:16px;font-weight:600;line-height:1.4;font-variant-numeric:tabular-nums}' +
-      '.td-stat-note{display:block;color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:11px;line-height:1.5}' +
-      '.td-saved .td-stat-value{color:var(--dsw-alias-brand-primary,var(--dsw-alias-label-primary))}'
-    if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-tool-disclosure/card.css"]') === null) {
+      '.td-value{flex:none;font-variant-numeric:tabular-nums}' +
+      // Only used when the shell stops seeding the primitives: same box Pill
+      // draws, so the row does not change shape on the way down.
+      '.td-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}' +
+      // 36x20 track, 16px knob, 16px travel, radius 999 — the metrics the
+      // harness's own toggles use. Off is the module-platform fill every
+      // unpressed control on these pages sits on; on is the primary button
+      // fill, so a deferred group reads the same as any other engaged control.
+      '.td-switch{appearance:none;flex:none;cursor:pointer;box-sizing:border-box;width:36px;height:20px;padding:0;border:none;border-radius:999px;background:var(--dsw-alias-bg-module-platform);position:relative;transition:background .16s}' +
+      '.td-switch:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}' +
+      '.td-switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}' +
+      '.td-switch:disabled{cursor:default;opacity:.4}' +
+      '.td-switch[aria-checked="true"]{background:var(--dsw-alias-button-primary-fill)}' +
+      '.td-switch[aria-checked="true"]:hover:not(:disabled){background:var(--dsw-alias-button-primary-fill)}' +
+      // Knob colours stay as they were traced from the shell's own switch: a
+      // label-secondary thumb is what carries against the off track, and
+      // label-primary-foreground is the foreground the primary fill is paired
+      // with everywhere else, so the on state does not fight it on any theme.
+      '.td-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .16s,background .16s}' +
+      '.td-switch[aria-checked="true"] .td-knob{transform:translateX(16px);background:var(--dsw-alias-label-primary-foreground)}'
+    if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-tool-disclosure/section.css"]') === null) {
       const tag = document.createElement('style')
-      tag.dataset.pluginCss = 'dsh-tool-disclosure/card.css'
+      tag.dataset.pluginCss = 'dsh-tool-disclosure/section.css'
       tag.textContent = CSS
       document.head.appendChild(tag)
     }
@@ -196,11 +216,7 @@ window.__ModuleLoader__.load({
       const showNames = names.length > 1 || (names.length === 1 && names[0] !== group.id)
       return h('div', { className: 'td-row' },
         h('span', { className: 'td-rowtext' },
-          h('span', { className: 'td-id' }, group.id),
-          // Clamped, with the whole thing on hover: the summary is written
-          // for the model, and at full length it pushes the switch it
-          // belongs to off the first screenful. Same for the names of a
-          // 24-tool server.
+          h('span', { className: 'td-title' }, group.id),
           group.summary ? h('span', { className: 'td-summary', title: group.summary }, group.summary) : null,
           showNames ? h('span', { className: 'td-names', title: names.join('\n') }, names.join(', ')) : null,
           h('span', { className: 'td-cost' }, cost)),
@@ -212,11 +228,21 @@ window.__ModuleLoader__.load({
         }))
     }
 
-    function Stat(props) {
-      return h('div', { className: props.accent ? 'td-stat td-saved' : 'td-stat' },
-        h('span', { className: 'td-stat-label' }, props.label),
-        h('span', { className: 'td-stat-value' }, props.value),
-        props.note ? h('span', { className: 'td-stat-note' }, props.note) : null)
+    /**
+     * One measured figure, as a setting row with the number where a control
+     * would sit.
+     *
+     * Tiles were an invented shape: the settings panel has no card grammar for
+     * a statistic, and two bordered boxes read as a widget rather than as part
+     * of the page. A `Pill` is what the harness puts at the end of a row when
+     * the row is reporting rather than offering something to press.
+     */
+    function StatRow(props) {
+      return h('div', { className: 'td-row' },
+        h('span', { className: 'td-rowtext' },
+          h('span', { className: 'td-title' }, props.label),
+          props.note ? h('span', { className: 'td-desc' }, props.note) : null),
+        h(Pill, { className: 'td-value' }, props.unit ? props.value + ' ' + props.unit : props.value))
     }
 
     function ToolDisclosureSection(props) {
@@ -282,48 +308,48 @@ window.__ModuleLoader__.load({
       const total = (data && data.total) || { tools: 0, tokens: 0 }
       const held = (data && data.deferred) || { tools: 0, tokens: 0 }
 
-      return h('li', { className: 'td-card' },
-        h('div', { className: 'td-head' },
-          h('span', { className: 'td-headtext' },
-            h('span', { className: 'td-name' }, t('title')),
-            h('span', { className: 'td-desc' }, t('description')))),
-        h('div', { className: 'td-body' },
-          h('p', { className: 'td-muted' }, t('hint')),
-          !writable ? h('p', { className: 'td-muted' }, t('readOnly')) : null,
-          // Shown beside the numbers as well as instead of them: a read that
-          // failed after one succeeded leaves what is on screen stale, and a
-          // measurement is only worth reading if the page says when it stopped
-          // being one.
-          unreachable ? h('p', { className: 'td-muted' }, t('unreachable')) : null,
-          data === null
-            ? (unreachable ? null : h('p', { className: 'td-muted' }, t('loading')))
-            : h(React.Fragment, null,
-                h('p', { className: 'td-sub' }, t('savingHeading')),
-                h('div', { className: 'td-stats' },
-                  // No "still advertised" figure: the measurement reads the
-                  // shared registry, and a session mounts mode tools of its
-                  // own on top of it, so that number would be a guess wearing
-                  // a decimal point. What is held back is exact.
-                  h(Stat, { label: t('savedLabel'), value: t('approx') + short(held.tokens), note: t('savedNote'), accent: true }),
-                  h(Stat, {
-                    label: t('deferredToolsLabel'),
-                    value: String(held.tools),
-                    note: t('ofRegistered').replace('%n', String(total.tools)),
-                  })),
-                held.tokens === 0 ? h('p', { className: 'td-muted' }, t('savingNone')) : null,
-                // One list, costliest first. Every tool the harness holds is
-                // in a group whether or not anyone wrote one down, so a page
-                // that split the hand-written half from the rest would be
-                // showing where the config came from — which is not what
-                // anyone is here to decide.
-                h('p', { className: 'td-sub' }, t('groupsHeading')),
-                h('p', { className: 'td-muted' }, t('groupsHint')),
-                groups.length === 0
-                  ? h('p', { className: 'td-muted' }, t('empty'))
-                  : groups.map((group) => h(GroupRow, {
+      return h('div', { className: 'td-section' },
+        h('h2', { className: 'td-heading' }, t('title')),
+        h('p', { className: 'td-intro' }, t('description')),
+        h('p', { className: 'td-intro' }, t('hint')),
+        !writable ? h('p', { className: 'td-note' }, t('readOnly')) : null,
+        // Shown beside the numbers as well as instead of them: a read that
+        // failed after one succeeded leaves what is on screen stale, and a
+        // measurement is only worth reading if the page says when it stopped
+        // being one.
+        unreachable ? h('p', { className: 'td-alert', role: 'alert' }, t('unreachable')) : null,
+        data === null
+          ? (unreachable ? null : h('p', { className: 'td-note' }, t('loading')))
+          : h(React.Fragment, null,
+              h('h3', { className: 'td-sub' }, t('savingHeading')),
+              h('div', { className: 'td-rows' },
+                // No "still advertised" figure: the measurement reads the
+                // shared registry, and a session mounts mode tools of its
+                // own on top of it, so that number would be a guess wearing
+                // a decimal point. What is held back is exact.
+                // The unit rides in `unit`, not folded into `value`: the figure
+                // is what anything reading this row is after.
+                h(StatRow, { label: t('savedLabel'), value: t('approx') + short(held.tokens), unit: t('savedNote') }),
+                h(StatRow, {
+                  label: t('deferredToolsLabel'),
+                  value: String(held.tools),
+                  note: t('ofRegistered').replace('%n', String(total.tools)),
+                })),
+              held.tokens === 0 ? h('p', { className: 'td-note' }, t('savingNone')) : null,
+              // One list, costliest first. Every tool the harness holds is
+              // in a group whether or not anyone wrote one down, so a page
+              // that split the hand-written half from the rest would be
+              // showing where the config came from — which is not what
+              // anyone is here to decide.
+              h('h3', { className: 'td-sub' }, t('groupsHeading')),
+              h('p', { className: 'td-note' }, t('groupsHint')),
+              groups.length === 0
+                ? h('p', { className: 'td-note' }, t('empty'))
+                : h('div', { className: 'td-rows' },
+                    groups.map((group) => h(GroupRow, {
                       key: group.id, t: t, group: group, writable: writable, onToggle: toggle,
-                    })),
-                h('p', { className: 'td-muted', style: { marginTop: '10px' } }, t('measured')))))
+                    }))),
+              h('p', { className: 'td-note' }, t('measured'))))
     }
 
     // --------------------------------------------------------------- nav icon
@@ -362,6 +388,10 @@ window.__ModuleLoader__.load({
         path.setAttribute('d', WRENCH_PATH)
         path.setAttribute('fill-rule', 'evenodd')
         path.setAttribute('clip-rule', 'evenodd')
+        // The gear is two paths (ring + inner dot); ours is one, so the
+        // leftover dot has to go or it draws through the new glyph.
+        const extra = svg.querySelectorAll('path')
+        for (let i = 1; i < extra.length; i += 1) extra[i].remove()
         svg.dataset.tdNavicon = '1'
       }
     }

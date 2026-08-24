@@ -34,6 +34,16 @@ window.__ModuleLoader__.load({
 
     const React = require('react')
     const h = React.createElement
+    // A platform seed module: the shell's `staticModules` table serves it the
+    // same way it serves `react`, so this needs no `inject` entry and no
+    // dependency — and must NOT be named in `dsh.client.inject`, which would
+    // make the loader demand a row that does not exist. Guarded anyway: a
+    // missing primitive must degrade the page, never blank it.
+    let P = {}
+    try { P = require('@deepseek-ai/dsh-client-ui-primitives') || {} } catch (error) { P = {} }
+    const Menu = P.Menu || null
+    const ChevronIcon = P.IconChevronDownOutline14 || null
+    const ThinkIcon = P.IconThinkOutline16 || null
 
     const NS = 'dsh-think-level'
     const CONFIG_ROUTE = '/api/dsh-think-level/config'
@@ -79,6 +89,7 @@ window.__ModuleLoader__.load({
       enableHint: '为该模型在 llm-pi-ai 中声明标准档位，立即生效，其他配置不变。若该部署并不真正支持，档位会被忽略——随时可以移除。',
       removeLevels: '移除档位声明',
       declaredHere: '该模型的思考档位由本插件声明。',
+      addHeading: '添加默认档位',
     }
     const en = {
       nav: 'Thinking Level',
@@ -103,6 +114,7 @@ window.__ModuleLoader__.load({
       enableHint: 'Declare the standard levels for this model in llm-pi-ai. It applies immediately and changes nothing else. If the deployment ignores them the levels are simply no-ops — remove them again whenever.',
       removeLevels: 'Remove levels',
       declaredHere: 'This model’s thinking levels are declared by this plugin.',
+      addHeading: 'Add a default',
     }
 
     // ------------------------------------------------------------ transport
@@ -146,21 +158,54 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------------- styles
+    // The settings page speaks the harness's own grammar, taken from its
+    // shipped `PermissionRow` / `fields` modules: a flat stack of 16px rows
+    // with a border-l2 rule under each, 14/22 titles over 12/18 tertiary
+    // descriptions, and 36px radius-18 selectors. No card around the section —
+    // the settings shell already pads the panel (`padding: 0 24px 24px`), and a
+    // border here reads as a foreign widget dropped into the page as well as
+    // clipping the description text at its right edge.
     const CSS =
-      '.tl-card{list-style:none;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-bg-layer-2));border-radius:12px}' +
-      '.tl-card-header{appearance:none;width:100%;font:inherit;color:inherit;text-align:left;background:0 0;border:0;align-items:center;gap:12px;padding:14px 16px;display:flex}' +
-      '.tl-card-head{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}' +
-      '.tl-card-name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}' +
-      '.tl-card-desc{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:13px;line-height:1.5}' +
-      '.tl-card-body{border-top:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));margin:0 16px;padding:12px 0 8px}' +
-      '.tl-row{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}' +
-      '.tl-row-label{flex:1 1 220px;min-width:160px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}' +
-      '.tl-input{box-sizing:border-box;font:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:6px;padding:5px 8px;font-size:13px;line-height:1.5;min-width:130px}' +
-      '.tl-input:disabled{opacity:.55}' +
-      '.tl-btn{appearance:none;font:inherit;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);background:transparent}' +
-      '.tl-btn:disabled{cursor:default;opacity:.55}' +
-      '.tl-btn-primary{color:#fff;background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary));border-color:transparent}' +
-      '.tl-muted{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));margin:0 0 8px;font-size:12px;line-height:1.5}' +
+      '.tl-section{max-width:760px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:12px}' +
+      '.tl-heading{margin:0;font-size:18px;font-weight:600;line-height:26px}' +
+      '.tl-intro{margin:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-tertiary)}' +
+      '.tl-readonly{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}' +
+      '.tl-rows{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}' +
+      '.tl-row{display:flex;align-items:center;gap:8px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}' +
+      '.tl-row-flush{border-bottom:none;padding:8px 0 0}' +
+      '.tl-rowtext{display:flex;flex-direction:column;flex:1;gap:4px;min-width:0;padding-right:48px}' +
+      '.tl-title{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:400;line-height:22px;overflow-wrap:anywhere}' +
+      '.tl-desc{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400;line-height:18px}' +
+      '.tl-empty{margin:0;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2);' +
+      'color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:20px}' +
+      // The dropdown trigger. The harness has no styled `<select>` anywhere;
+      // every Settings dropdown is this button plus a portalled menu.
+      '.tl-selector{display:inline-flex;align-items:center;gap:12px;max-width:240px;height:36px;padding:0 14px;' +
+      'border:none;border-radius:18px;background:var(--dsw-alias-bg-module-platform);' +
+      'color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;line-height:22px;cursor:pointer}' +
+      '.tl-selector:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}' +
+      '.tl-selector:disabled{cursor:default;color:var(--dsw-alias-label-tertiary)}' +
+      '.tl-selector[data-empty="1"]{color:var(--dsw-alias-label-tertiary)}' +
+      '.tl-sel-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.tl-chev{flex:none;display:inline-flex;color:var(--dsw-alias-label-caption)}' +
+      // Stacked field: label above, controls below. For the add line, whose
+      // three values are too long to sit opposite a label.
+      '.tl-field{display:flex;flex-direction:column;gap:6px;padding:12px 0}' +
+      '.tl-label{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500;line-height:1.5}' +
+      '.tl-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}' +
+      '.tl-hint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}' +
+      // Only ever reached if the primitives seed module is absent; the metrics
+      // are the harness's stacked-field ones so even the degraded page fits in.
+      '.tl-input{box-sizing:border-box;height:34px;padding:0 12px;border-radius:8px;' +
+      'border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);' +
+      'color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5}' +
+      '.tl-input:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}' +
+      '.tl-fbtn{appearance:none;font:inherit;cursor:pointer;height:28px;padding:0 10px;border-radius:14px;' +
+      'border:1px solid var(--dsw-alias-border-l2);background:0 0;color:var(--dsw-alias-label-primary);' +
+      'font-size:12px;line-height:18px}' +
+      '.tl-fbtn-primary{border-color:transparent;background:var(--dsw-alias-button-primary-fill);' +
+      'color:var(--dsw-alias-label-primary-foreground)}' +
+      '.tl-fbtn:disabled{opacity:.4;cursor:not-allowed}' +
       // The composer control copies the harness's own menu trigger — same
       // height, radius, weight and hover as the access-mode selector sitting
       // next to it — because a control in that row that styles itself reads as
@@ -189,7 +234,7 @@ window.__ModuleLoader__.load({
       'background:transparent;cursor:pointer;font:inherit;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);text-align:left}' +
       '.tl-item:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}' +
       '.tl-item-label{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.tl-item-note{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:12px}' +
+      '.tl-item-note{color:var(--dsw-alias-label-tertiary);font-size:12px}' +
       '.tl-check{flex:0 0 auto;color:var(--dsw-alias-label-primary)}' +
       // The one action row carries a subtitle rather than a trailing note: the
       // level list is longer than the label, and side by side inside a menu
@@ -217,6 +262,10 @@ window.__ModuleLoader__.load({
       + '-.6 1.1-.1 2.6 1.1 3 .1 1.3 1.4 2.2 2.6 1.9.4.8 1.5 1.1 2.1.6'
 
     function LevelIcon() {
+      // The app's own thinking glyph where the shell serves it, so the pill,
+      // the Settings nav row and the harness's own thinking affordances are one
+      // mark. The hand-drawn brain below stays as the fallback.
+      if (ThinkIcon !== null) return h(ThinkIcon, { size: 14, className: 'tl-icon' })
       return h('svg', {
         className: 'tl-icon', width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
         stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
@@ -266,19 +315,77 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------- settings page
-    function Select(props) {
-      return h('select', {
-        className: 'tl-input',
-        value: props.value,
-        disabled: props.disabled,
-        onChange: (event) => props.onChange(event.target.value),
-      },
-        h('option', { key: '', value: '', disabled: true }, props.placeholder),
-        props.options.map((option) => h('option', { key: option.id, value: option.id }, option.name)),
-      )
+    /** `P.Button` when the seed module is there; a plain button when it is not. */
+    function FallbackButton(props) {
+      const rest = {}
+      for (const key in props) if (key !== 'variant' && key !== 'size' && key !== 'icon') rest[key] = props[key]
+      rest.type = props.type || 'button'
+      rest.className = 'tl-fbtn'
+        + (props.variant === 'primary' ? ' tl-fbtn-primary' : '')
+        + (props.className ? ' ' + props.className : '')
+      return h('button', rest)
+    }
+    const Button = P.Button || FallbackButton
+
+    /** The chevron the harness puts on its own selector triggers. */
+    function SelChevron() {
+      if (ChevronIcon !== null) return h(ChevronIcon, { className: 'tl-chev' })
+      return h(Chevron, { open: false })
     }
 
-    function ThinkLevelCard(props) {
+    /**
+     * A dropdown in the harness's shape: a `.tl-selector` button plus a
+     * portalled `Menu`. There is no styled `<select>` anywhere in this app, so
+     * a native one paints the OS chrome next to the app's pill controls and is
+     * the single loudest thing on the page. `portal: true` is not optional —
+     * the settings panel's scroll container clips an inline menu.
+     */
+    function Selector(props) {
+      const [open, setOpen] = React.useState(false)
+      const options = props.options || []
+      const disabled = props.disabled === true || options.length === 0
+      let label = props.placeholder
+      for (const option of options) if (option.id === props.value) label = option.name
+      const empty = label === props.placeholder
+
+      if (Menu === null) {
+        return h('select', {
+          className: 'tl-input',
+          value: props.value,
+          disabled: disabled,
+          'aria-label': props.placeholder,
+          onChange: (event) => props.onChange(event.target.value),
+        },
+          h('option', { key: '', value: '', disabled: true }, props.placeholder),
+          options.map((option) => h('option', { key: option.id, value: option.id }, option.name)),
+        )
+      }
+
+      return h(Menu, {
+        open: open && !disabled,
+        onClose: () => setOpen(false),
+        items: options.map((option) => ({ id: option.id, label: option.name })),
+        selectedId: props.value === '' ? undefined : props.value,
+        onSelect: (id) => { setOpen(false); if (id !== props.value) props.onChange(id) },
+        align: 'end',
+        portal: true,
+        anchor: h('button', {
+          type: 'button',
+          className: 'tl-selector',
+          'data-empty': empty ? '1' : '0',
+          'aria-haspopup': 'menu',
+          'aria-expanded': open ? 'true' : 'false',
+          'aria-label': props.placeholder,
+          disabled: disabled,
+          onClick: () => setOpen((was) => !was),
+        },
+          h('span', { className: 'tl-sel-label' }, label),
+          h(SelChevron, null),
+        ),
+      })
+    }
+
+    function ThinkLevelPanel(props) {
       const t = props.t || ((key) => key)
       const [view, setView] = React.useState({ status: 'unavailable', value: { defaults: [] }, writable: false })
       const [catalog, setCatalog] = React.useState({ providers: [], models: {} })
@@ -309,7 +416,7 @@ window.__ModuleLoader__.load({
       const writable = view.writable === true
       const models = selProvider && catalog.models[selProvider] ? catalog.models[selProvider] : []
 
-      // Every route whose level list this card needs to render right now: one
+      // Every route whose level list this page needs to render right now: one
       // per configured row, plus the pair being composed in the add line.
       const wanted = rows.map((row) => KEY(row.provider, row.model))
       if (selProvider && selModel) wanted.push(KEY(selProvider, selModel))
@@ -389,75 +496,90 @@ window.__ModuleLoader__.load({
         const supported = Array.isArray(declaration.supported) ? declaration.supported : []
         const mine = declaration.declared !== null && declaration.declared !== undefined && declaration.declared !== false
         if (supported.length === 0) {
-          declareRow = h('div', { className: 'tl-row' },
-            h('span', { className: 'tl-row-label' }, t('noReasoning')),
+          declareRow = h('div', { className: 'tl-row tl-row-flush' },
+            h('div', { className: 'tl-rowtext' },
+              h('div', { className: 'tl-title' }, t('noReasoning')),
+              h('div', { className: 'tl-desc' }, declaration.writable === true ? t('enableHint') : t('noLevelsHint'))),
             declaration.writable === true
-              ? h('button', { className: 'tl-btn', title: t('enableHint'), onClick: () => declare(declaration.suggested) }, t('enable'))
+              ? h(Button, {
+                variant: 'primary',
+                size: 'sm',
+                title: t('enableHint'),
+                onClick: () => declare(declaration.suggested),
+              }, t('enable'))
               : null)
         } else if (mine && declaration.writable === true) {
-          declareRow = h('div', { className: 'tl-row' },
-            h('span', { className: 'tl-row-label' }, t('declaredHere')),
-            h('button', { className: 'tl-btn', onClick: () => declare(null) }, t('removeLevels')))
+          declareRow = h('div', { className: 'tl-row tl-row-flush' },
+            h('div', { className: 'tl-rowtext' },
+              h('div', { className: 'tl-title' }, t('declaredHere')),
+              h('div', { className: 'tl-desc' }, t('enableNote'))),
+            h(Button, { variant: 'outline', size: 'sm', onClick: () => declare(null) }, t('removeLevels')))
         }
       }
 
-      return h('li', { className: 'tl-card' },
-        h('div', { className: 'tl-card-header' },
-          h('span', { className: 'tl-card-head' },
-            h('span', { className: 'tl-card-name' }, t('title')),
-            h('span', { className: 'tl-card-desc' }, t('description')))),
-        h('div', { className: 'tl-card-body' },
-          h('p', { className: 'tl-muted' }, t('hint')),
-          !writable ? h('p', { className: 'tl-muted' }, t('readOnly')) : null,
-          rows.length === 0 ? h('p', { className: 'tl-muted' }, t('noRows')) : null,
+      return h('div', { className: 'tl-section' },
+        h('h2', { className: 'tl-heading' }, t('title')),
+        h('p', { className: 'tl-intro' }, t('description')),
+        !writable ? h('p', { className: 'tl-readonly', role: 'status' }, t('readOnly')) : null,
+        h('div', { className: 'tl-rows' },
+          rows.length === 0 ? h('p', { className: 'tl-empty' }, t('noRows')) : null,
           rows.map((row) => {
             const key = KEY(row.provider, row.model)
             const levels = efforts[key]
+            // While the level list is still loading, the row still has to show
+            // the effort it stores — an empty control would read as "no level
+            // set" for a row that very much sets one.
+            const options = levels === undefined || levels.length === 0
+              ? [{ id: row.effort, name: row.effort }]
+              : levels
             return h('div', { key: key, className: 'tl-row' },
-              h('span', { className: 'tl-row-label' }, row.provider + ' / ' + row.model),
-              // While the level list is still loading, the row still has to
-              // show the effort it stores — an empty select would read as "no
-              // level set" for a row that very much sets one.
-              h('select', {
-                className: 'tl-input',
+              h('div', { className: 'tl-rowtext' },
+                h('div', { className: 'tl-title' }, row.provider + ' / ' + row.model)),
+              h(Selector, {
                 value: row.effort,
+                options: options,
                 disabled: !writable,
-                onChange: (event) => updateRow(row.provider, row.model, event.target.value),
-              }, (levels === undefined || levels.length === 0
-                ? [{ id: row.effort, name: row.effort }]
-                : levels).map((level) => h('option', { key: level.id, value: level.id }, level.name))),
-              h('button', {
-                className: 'tl-btn',
+                placeholder: t('effortLabel'),
+                onChange: (id) => updateRow(row.provider, row.model, id),
+              }),
+              h(Button, {
+                variant: 'outline',
+                size: 'sm',
                 disabled: !writable,
                 onClick: () => removeRow(row.provider, row.model),
               }, t('remove')))
           }),
-          h('div', { className: 'tl-row' },
-            h(Select, {
+        ),
+        h('div', { className: 'tl-field' },
+          h('div', { className: 'tl-label' }, t('addHeading')),
+          h('div', { className: 'tl-controls' },
+            h(Selector, {
               value: selProvider, options: catalog.providers, disabled: !writable,
               placeholder: t('providerLabel'), onChange: setSelProvider,
             }),
-            h(Select, {
+            h(Selector, {
               value: selModel, options: models, disabled: !writable,
               placeholder: t('modelLabel'), onChange: setSelModel,
             }),
-            h(Select, {
+            h(Selector, {
               value: selEffort, options: addLevels, disabled: !writable || addLevels.length === 0,
               placeholder: t('effortLabel'), onChange: setSelEffort,
             }),
-            h('button', {
-              className: 'tl-btn tl-btn-primary',
+            h(Button, {
+              variant: 'primary',
+              size: 'sm',
               disabled: !writable || !selProvider || !selModel || !selEffort,
               onClick: addRow,
             }, t('add'))),
           declareRow,
         ),
+        h('p', { className: 'tl-hint' }, t('hint')),
       )
     }
 
     /** The `settings.section` page. */
     function ThinkLevelSection(props) {
-      return h('ul', { style: { listStyle: 'none', margin: 0, padding: 0 } }, h(ThinkLevelCard, props))
+      return h(ThinkLevelPanel, props)
     }
 
     // -------------------------------------------------------- composer pill
@@ -716,6 +838,88 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // --------------------------------------------------------------- nav icon
+    // The settings shell picks each nav glyph from a hardcoded section-id ->
+    // icon map (`SettingsRoot.navIcon`) and falls back to the settings gear for
+    // ids it does not know, which is ours. `settings.section` carries no icon
+    // option, so the only way to show a brain there is to retouch the rendered
+    // one: swap the gear's geometry for the official IconThinkOutline16 — the
+    // same glyph the pill wears — on our row only.
+    //
+    // Deliberately a mutation of the node React already rendered, not a node
+    // replacement: the shell re-renders this icon with unchanged props, so
+    // React diffs nothing and never restores the gear. Two paths, so the whole
+    // inner markup is set at once rather than one `d` rewritten. A remount
+    // (closing and reopening the panel) paints a fresh gear, which the observer
+    // catches. Everything here is best-effort — if dsh moves its internals,
+    // nothing matches and the row simply keeps the gear.
+    const THINK_ICON_MARKUP =
+      '<path fill="currentColor" d="M8.00192 6.64454C8.75026 6.64454 9.35732 7.25169 9.35739 8.00001C9.35739 8.74838'
+      + ' 8.7503 9.35548 8.00192 9.35548C7.25367 9.35533 6.64743 8.74829 6.64743 8.00001C6.6475 7.25178 7.25371'
+      + ' 6.64468 8.00192 6.64454Z"/>'
+      + '<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M9.97165 1.29981C11.5853 0.718916'
+      + ' 13.271 0.642197 14.3144 1.68555C15.3577 2.72902 15.2811 4.41466 14.7002 6.02833C14.4707 6.66561 14.1504'
+      + ' 7.32937 13.75 8.00001C14.1504 8.67062 14.4707 9.33444 14.7002 9.97169C15.2811 11.5854 15.3578 13.271'
+      + ' 14.3144 14.3145C13.271 15.3579 11.5854 15.2811 9.97165 14.7002C9.3344 14.4708 8.67059 14.1505 7.99997'
+      + ' 13.75C7.32933 14.1505 6.66558 14.4708 6.02829 14.7002C4.41461 15.2811 2.72899 15.3578 1.68552'
+      + ' 14.3145C0.642155 13.271 0.71887 11.5854 1.29977 9.97169C1.52915 9.33454 1.84865 8.67049 2.24899'
+      + ' 8.00001C1.84866 7.32953 1.52915 6.66544 1.29977 6.02833C0.718852 4.41459 0.64207 2.729 1.68552'
+      + ' 1.68555C2.72897 0.642112 4.41456 0.718887 6.02829 1.29981C6.66541 1.52918 7.32949 1.8487 7.99997'
+      + ' 2.24903C8.67045 1.84869 9.33451 1.52919 9.97165 1.29981ZM12.9404 9.2129C12.4391 9.893 11.8616 10.5681'
+      + ' 11.2148 11.2149C10.568 11.8616 9.89296 12.4391 9.21286 12.9404C9.62532 13.1579 10.0271 13.338 10.4121'
+      + ' 13.4766C11.9146 14.0174 12.9172 13.8738 13.3955 13.3955C13.8737 12.9173 14.0174 11.9146 13.4765'
+      + ' 10.4121C13.3379 10.0271 13.1578 9.62535 12.9404 9.2129ZM3.05856 9.2129C2.84121 9.62523 2.66197 10.0272'
+      + ' 2.52341 10.4121C1.98252 11.9146 2.12627 12.9172 2.60446 13.3955C3.08278 13.8737 4.08544 14.0174 5.58786'
+      + ' 13.4766C5.97264 13.338 6.37389 13.1577 6.7861 12.9404C6.10624 12.4393 5.43168 11.8614 4.78513'
+      + ' 11.2149C4.13823 10.5679 3.55992 9.89313 3.05856 9.2129ZM7.99899 3.792C7.23179 4.31419 6.45306 4.95512'
+      + ' 5.70407 5.70411C4.95509 6.45309 4.31415 7.23184 3.79196 7.99903C4.3143 8.76666 4.95471 9.54653 5.70407'
+      + ' 10.2959C6.45309 11.0449 7.23271 11.6848 7.99997 12.207C8.76725 11.6848 9.54683 11.0449 10.2959'
+      + ' 10.2959C11.0449 9.54686 11.6848 8.76729 12.207 8.00001C11.6848 7.23275 11.0449 6.45312 10.2959'
+      + ' 5.70411C9.5465 4.95475 8.76662 4.31434 7.99899 3.792ZM5.58786 2.52344C4.08533 1.98255 3.08272 2.12625'
+      + ' 2.60446 2.6045C2.12621 3.08275 1.98252 4.08536 2.52341 5.5879C2.66189 5.97253 2.8414 6.37409 3.05856'
+      + ' 6.78614C3.55983 6.10611 4.1384 5.43189 4.78513 4.78516C5.43186 4.13843 6.10606 3.55987 6.7861'
+      + ' 3.0586C6.37405 2.84144 5.97249 2.66192 5.58786 2.52344ZM13.3955 2.6045C12.9172 2.12631 11.9146 1.98257'
+      + ' 10.4121 2.52344C10.0272 2.66201 9.62519 2.84125 9.21286 3.0586C9.8931 3.55996 10.5679 4.13827 11.2148'
+      + ' 4.78516C11.8614 5.43172 12.4392 6.10627 12.9404 6.78614C13.1577 6.37393 13.338 5.97267 13.4765'
+      + ' 5.5879C14.0174 4.08549 13.8736 3.08281 13.3955 2.6045Z"/>'
+    const NAV_LABELS = [zh.nav, en.nav]
+
+    /** Repaint our settings nav row's glyph; no-op once it is already ours. */
+    function paintNavIcon() {
+      const cells = document.querySelectorAll('[role="dialog"] nav button')
+      for (const cell of cells) {
+        if (NAV_LABELS.indexOf((cell.textContent || '').trim()) === -1) continue
+        const svg = cell.querySelector('svg')
+        if (svg === null) continue
+        // The flag alone is not enough: if the shell ever re-renders the icon's
+        // children the flag survives on the node while the gear comes back, so
+        // the painted shape is checked too.
+        if (svg.dataset.tlNavicon === '1' && svg.childElementCount === 2) continue
+        svg.setAttribute('viewBox', '0 0 16 16')
+        svg.innerHTML = THINK_ICON_MARKUP
+        svg.dataset.tlNavicon = '1'
+      }
+    }
+
+    /** Keep repainting across panel mounts; coalesced to one pass per frame. */
+    function watchNavIcon() {
+      if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return
+      let queued = false
+      const run = () => {
+        queued = false
+        try { paintNavIcon() } catch (error) { /* shell internals moved */ }
+      }
+      const schedule = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (fn) => setTimeout(fn, 16)
+      new MutationObserver(() => {
+        if (queued) return
+        queued = true
+        schedule(run)
+      }).observe(document.body, { childList: true, subtree: true })
+      run()
+    }
+
     // ------------------------------------------------------------------ apply
 
     const inject = ['slots', 'locale']
@@ -749,6 +953,11 @@ window.__ModuleLoader__.load({
         )
       } catch (error) {
         console.warn('[dsh-think-level] settings page failed to mount:', error)
+      }
+      try {
+        watchNavIcon()
+      } catch (error) {
+        console.warn('[dsh-think-level] nav icon swap unavailable:', error)
       }
       try {
         // Scoped-inject rather than a module-level dependency: the Settings

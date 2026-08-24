@@ -1,12 +1,16 @@
 /**
  * dsh-gen-limit — browser half.
  *
- * Registers the "Generation Concurrency" configuration card into the Web
- * settings panel (设置面板 → 插件 → 插件配置, the official
- * `settings.plugin.item` slot). It reads/writes the host-registered
+ * Registers the "Generation Concurrency" page into the Web settings panel as a
+ * top-level `settings.section` nav entry. It reads/writes the host-registered
  * `dsh-gen-limit` settings namespace through the plugin-owned
  * /api/dsh-gen-limit/* routes (see lib/settings-routes.js), and lists the
  * live providers/models from the same source the conversation uses.
+ *
+ * Chrome comes from `@deepseek-ai/dsh-client-ui-primitives`, the shell's seed
+ * module (available to any bundle exactly like `react`, with no `inject` entry
+ * and no dependency), so the controls are the same Button/Input/Menu/Pill the
+ * harness's own settings pages draw.
  *
  * Plain JavaScript on purpose: the loader serves this at
  * /plugins/@creait/dsh-gen-limit/client.js and calls
@@ -22,6 +26,16 @@ window.__ModuleLoader__.load({
 
     const React = require('react')
     const h = React.createElement
+
+    // Seed module: resolved by the shell itself, never declared as a dependency
+    // or an inject. Guarded anyway — a missing primitive must degrade to the
+    // plain markup below, never blank the Settings page.
+    let P = {}
+    try {
+      P = require('@deepseek-ai/dsh-client-ui-primitives') || {}
+    } catch (error) {
+      P = {}
+    }
 
     const NS = 'dsh-gen-limit'
     const CONFIG_ROUTE = '/api/dsh-gen-limit/config'
@@ -73,28 +87,43 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------------- styles
+    // Metrics are the harness's own: 16px row padding over a border-l2 rule,
+    // 14/22 titles, 12/18 tertiary descriptions, 36px radius-18 selectors,
+    // 8px field radii. Every token used here exists in dsh-client-ui-theme, so
+    // there are no fallback chains.
     const CSS =
-      '.gl-card{list-style:none;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-bg-layer-2));border-radius:12px;transition:border-color .16s,background .16s}' +
-      '.gl-card-header{appearance:none;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;align-items:center;gap:12px;padding:14px 16px;display:flex}' +
-      '.gl-card-head{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}' +
-      '.gl-card-name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}' +
-      '.gl-card-desc{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:13px;line-height:1.5}' +
-      '.gl-card-chevron{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));flex:none;transition:transform .16s}' +
-      '.gl-chevron-open{transform:rotate(180deg)}' +
-      '.gl-card-body{border-top:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));margin:0 16px;padding:12px 0 8px}' +
-      '.gl-row{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}' +
-      '.gl-row-label{flex:1 1 220px;min-width:160px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}' +
-      '.gl-active{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));font-size:12px}' +
-      '.gl-input{box-sizing:border-box;font:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:6px;padding:5px 8px;font-size:13px;line-height:1.5}' +
-      '.gl-select{min-width:130px}.gl-num{width:86px}.gl-addsel{min-width:150px}' +
-      '.gl-btn{appearance:none;font:inherit;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);background:transparent}' +
-      '.gl-btn:disabled{cursor:default;opacity:.55}' +
-      '.gl-btn-primary{color:#fff;background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary));border-color:transparent}' +
-      '.gl-muted{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));margin:0 0 8px;font-size:12px;line-height:1.5}' +
-      '.gl-form{margin-top:4px}' +
-      '.gl-sub{color:var(--dsw-alias-label-secondary);font-size:13px;font-weight:600;line-height:1.5;margin:14px 0 6px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1))}' +
-      '.gl-note{color:var(--dsw-alias-label-tertiary,var(--dsw-alias-label-secondary));margin:-4px 0 10px;font-size:12px;line-height:1.5}' +
-      '.gl-wide{width:120px}'
+      '.gl-section{max-width:760px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:12px}' +
+      '.gl-heading{margin:0;font-size:18px;font-weight:600;line-height:26px}' +
+      '.gl-intro{margin:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-tertiary)}' +
+      '.gl-subheading{margin:12px 0 0;font-size:14px;font-weight:600;line-height:22px;color:var(--dsw-alias-label-primary)}' +
+      '.gl-readonly{margin:0;padding:8px 12px;border-radius:8px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary)}' +
+      '.gl-stack{display:flex;flex-direction:column}' +
+      '.gl-stack>:last-child{border-bottom:none}' +
+      '.gl-row{display:flex;align-items:center;gap:8px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}' +
+      '.gl-row-text{display:flex;flex-direction:column;flex:1;gap:4px;min-width:0;padding-right:48px}' +
+      '.gl-title{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:400;line-height:22px;overflow-wrap:anywhere}' +
+      '.gl-desc{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400;line-height:18px}' +
+      '.gl-add{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}' +
+      '.gl-pills{display:inline-flex;align-items:center;gap:6px;flex:none}' +
+      '.gl-selector{display:inline-flex;align-items:center;gap:12px;height:36px;padding:0 14px;border:none;border-radius:18px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;line-height:22px;cursor:pointer}' +
+      '.gl-selector:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}' +
+      '.gl-selector:disabled{cursor:default}' +
+      '.gl-selector-label{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.gl-selector-empty{color:var(--dsw-alias-label-tertiary)}' +
+      '.gl-chevron{flex:none}' +
+      // The Input primitive's wrap is inline-flex with no width of its own, so
+      // the width lives on this holder and is handed down to whatever it wraps.
+      '.gl-field{display:inline-flex;flex:none}' +
+      '.gl-field>*{width:100%}' +
+      '.gl-field input{width:100%;min-width:0}' +
+      '.gl-num{width:96px}.gl-wide{width:120px}' +
+      // Used only if the primitives module ever fails to resolve.
+      '.gl-input{box-sizing:border-box;height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5}' +
+      '.gl-input:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}' +
+      '.gl-input:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}' +
+      '.gl-btn{appearance:none;font:inherit;cursor:pointer;height:36px;padding:0 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:18px;font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary);background:transparent}' +
+      '.gl-btn:disabled{cursor:not-allowed;opacity:.4}' +
+      '.gl-btn-primary{color:var(--dsw-alias-label-primary-foreground);background:var(--dsw-alias-button-primary-fill);border-color:transparent}'
     if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-gen-limit/card.css"]') === null) {
       const tag = document.createElement('style')
       tag.dataset.pluginCss = 'dsh-gen-limit/card.css'
@@ -102,30 +131,101 @@ window.__ModuleLoader__.load({
       document.head.appendChild(tag)
     }
 
-    // ------------------------------------------------------------ component
-    /** Simple field primitives. */
-    function Select(props) {
-      return h('select', {
-        className: props.className ? 'gl-input gl-select ' + props.className : 'gl-input gl-select',
+    // --------------------------------------------------------- primitives
+    /** Pill-shaped action button; falls back to bare markup without the seed. */
+    function Btn(props) {
+      if (P.Button) {
+        return h(P.Button, {
+          type: 'button',
+          variant: props.variant || 'outline',
+          size: props.size || 'md',
+          disabled: props.disabled,
+          onClick: props.onClick,
+        }, props.children)
+      }
+      return h('button', {
+        type: 'button',
+        className: props.variant === 'primary' ? 'gl-btn gl-btn-primary' : 'gl-btn',
+        disabled: props.disabled,
+        onClick: props.onClick,
+      }, props.children)
+    }
+
+    /** Numeric field. The holder owns the width; the primitive owns the chrome. */
+    function Num(props) {
+      const attrs = {
+        type: 'number',
         value: props.value,
         disabled: props.disabled,
+        placeholder: props.placeholder,
         onChange: (e) => props.onChange(e.target.value),
-      },
-        React.createElement('option', { value: '', disabled: true }, props.placeholder),
-        props.options.map((o) => h('option', { key: o.id, value: o.id }, o.name)),
-      )
+      }
+      return h('span', { className: props.wide ? 'gl-field gl-wide' : 'gl-field gl-num' },
+        P.Input ? h(P.Input, attrs) : h('input', Object.assign({ className: 'gl-input' }, attrs)))
     }
-    function Num(props) {
-      return h('input', {
-        className: props.wide ? 'gl-input gl-num gl-wide' : 'gl-input gl-num',
-        type: 'number', value: props.value, disabled: props.disabled,
-        placeholder: props.placeholder, onChange: (e) => props.onChange(e.target.value),
+
+    /**
+     * The harness has no styled `<select>`: every Settings dropdown is a
+     * `.selector` button plus a Menu, portalled so it is not clipped by the
+     * settings panel.
+     */
+    function Selector(props) {
+      const [open, setOpen] = React.useState(false)
+      const options = props.options || []
+      const disabled = !!props.disabled || options.length === 0
+      const current = options.filter((o) => o.id === props.value)[0]
+      if (!P.Menu) {
+        return h('select', {
+          className: 'gl-input',
+          value: props.value,
+          disabled: disabled,
+          onChange: (e) => props.onChange(e.target.value),
+        },
+          h('option', { value: '', disabled: true }, props.placeholder),
+          options.map((o) => h('option', { key: o.id, value: o.id }, o.name)))
+      }
+      return h(P.Menu, {
+        open,
+        onClose: () => setOpen(false),
+        items: options.map((o) => ({ id: o.id, label: o.name })),
+        selectedId: props.value,
+        onSelect: (id) => { setOpen(false); if (id !== props.value) props.onChange(id) },
+        align: 'end',
+        portal: true,
+        anchor: h('button', {
+          type: 'button',
+          className: 'gl-selector',
+          'aria-haspopup': 'menu',
+          'aria-expanded': open,
+          disabled: disabled,
+          onClick: () => setOpen((v) => !v),
+        },
+          h('span', { className: current ? 'gl-selector-label' : 'gl-selector-label gl-selector-empty' },
+            current ? current.name : props.placeholder),
+          P.IconChevronDownOutline14
+            ? h(P.IconChevronDownOutline14, { className: 'gl-chevron' })
+            : h('span', { className: 'gl-chevron', 'aria-hidden': true }, '▾')),
       })
     }
 
-    function GenLimitCard(props) {
-      const { t, expanded } = props
-      const [open, setOpen] = React.useState(!!expanded)
+    /** Small count badge: the harness's Pill, or plain tertiary text. */
+    function Count(props) {
+      if (P.Pill) return h(P.Pill, null, props.children)
+      return h('span', { className: 'gl-desc' }, props.children)
+    }
+
+    /** Label left, control right — the canonical settings row. */
+    function Row(props) {
+      return h('div', { className: 'gl-row' },
+        h('div', { className: 'gl-row-text' },
+          props.title === undefined ? null : h('div', { className: 'gl-title' }, props.title),
+          props.desc === undefined ? null : h('div', { className: 'gl-desc' }, props.desc)),
+        props.children)
+    }
+
+    // ------------------------------------------------------------ component
+    function GenLimitSection(props) {
+      const { t } = props
       const [view, setView] = React.useState({ status: 'unavailable', value: { limits: [] }, writable: false })
       const [catalog, setCatalog] = React.useState({ providers: [], models: {} })
       const [stats, setStats] = React.useState({})
@@ -164,7 +264,7 @@ window.__ModuleLoader__.load({
         queued.current = null
         // No `limits` in the body: this posts only what changed, so a limits
         // edit made elsewhere in the meantime is not overwritten by the array
-        // this card happened to be holding.
+        // this page happened to be holding.
         fetch(CONFIG_ROUTE, {
           method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
           body: JSON.stringify(patch),
@@ -228,15 +328,6 @@ window.__ModuleLoader__.load({
         setSelModel('')
       }, [selProvider, catalog])
 
-      if (!open && view.status !== 'ready') {
-        return h('li', { className: 'gl-card' },
-          h('button', { className: 'gl-card-header', onClick: () => setOpen(true), 'aria-expanded': false },
-            h('span', { className: 'gl-card-head' },
-              h('span', { className: 'gl-card-name' }, t('title')),
-              h('span', { className: 'gl-card-desc' }, t('description'))),
-            h('span', { className: 'gl-card-chevron', 'aria-hidden': true }, '▾')))
-      }
-
       const limits = (view.value && Array.isArray(view.value.limits)) ? view.value.limits : []
       const writable = view.writable === true
 
@@ -261,68 +352,53 @@ window.__ModuleLoader__.load({
           .catch(() => {})
       }
 
-      const showBody = expanded || open
-      return h('li', { className: 'gl-card' },
-        h('button', {
-          className: 'gl-card-header',
-          onClick: expanded ? undefined : () => setOpen(!open),
-          'aria-expanded': expanded ? true : open,
-          disabled: expanded,
-          style: expanded ? { cursor: 'default' } : undefined,
-        },
-          h('span', { className: 'gl-card-head' },
-            h('span', { className: 'gl-card-name' }, t('title')),
-            h('span', { className: 'gl-card-desc' }, t('description'))),
-          h('span', { className: 'gl-card-chevron', 'aria-hidden': true }, '▾')),
-        showBody
-          ? h('div', { className: 'gl-card-body' },
-              h('p', { className: 'gl-muted' }, t('hint')),
-              !writable ? h('p', { className: 'gl-muted' }, t('readOnly')) : null,
-              limits.length === 0 ? h('p', { className: 'gl-muted' }, t('noLimits')) : null,
-              limits.map((r) => {
-                const k = r.provider + '\u0000' + r.model
-                const live = stats[k]
-                const readout = live == null
-                  ? null
-                  : t('active') + ' ' + live.active + (live.waiting > 0 ? ', ' + t('waiting') + ' ' + live.waiting : '')
-                return h('div', { key: k, className: 'gl-row' },
-                  h('span', { className: 'gl-row-label' },
-                    r.provider + ' / ' + r.model,
-                    readout === null ? null : h('span', { className: 'gl-active' }, '  (' + readout + ')')),
-                  h(Num, {
-                    value: String(r.max), disabled: !writable, placeholder: t('maxHint'),
-                    onChange: (v) => updateMax(r.provider, r.model, v),
-                  }),
-                  h('button', { className: 'gl-btn', disabled: !writable, onClick: () => removeRow(r.provider, r.model) }, t('remove')))
+      return h('div', { className: 'gl-section' },
+        h('h2', { className: 'gl-heading' }, t('title')),
+        h('p', { className: 'gl-intro' }, t('description')),
+        !writable ? h('p', { className: 'gl-readonly' }, t('readOnly')) : null,
+        h('div', { className: 'gl-stack' },
+          limits.length === 0 ? h(Row, { desc: t('noLimits') }) : null,
+          limits.map((r) => {
+            const k = r.provider + '\u0000' + r.model
+            const live = stats[k]
+            return h(Row, { key: k, title: r.provider + ' / ' + r.model },
+              live == null
+                ? null
+                : h('span', { className: 'gl-pills' },
+                    h(Count, null, t('active') + ' ' + live.active),
+                    live.waiting > 0 ? h(Count, null, t('waiting') + ' ' + live.waiting) : null),
+              h(Num, {
+                value: String(r.max), disabled: !writable, placeholder: t('maxHint'),
+                onChange: (v) => updateMax(r.provider, r.model, v),
               }),
-              h('div', { className: 'gl-row gl-form' },
-                h(Select, {
-                  className: 'gl-addsel', value: selProvider, options: catalog.providers,
-                  placeholder: t('providerLabel'), onChange: setSelProvider,
-                }),
-                h(Select, {
-                  className: 'gl-addsel', value: selModel, options: models,
-                  placeholder: t('modelLabel'), onChange: setSelModel,
-                }),
-                h(Num, { value: newMax, onChange: setNewMax, placeholder: t('maxHint') }),
-                h('button', { className: 'gl-btn gl-btn-primary', disabled: !writable || !selProvider || !selModel, onClick: addRow }, t('add'))),
-              h('p', { className: 'gl-sub' }, t('queueHeading')),
-              h('div', { className: 'gl-row' },
-                h('span', { className: 'gl-row-label' }, t('queueTimeoutLabel')),
-                h(Num, {
-                  wide: true, value: queueText.queueTimeoutMs, disabled: !writable,
-                  placeholder: t('queueTimeoutHint'), onChange: onQueueChange('queueTimeoutMs', 0),
-                })),
-              h('p', { className: 'gl-note' }, t('queueTimeoutNote')),
-              h('div', { className: 'gl-row' },
-                h('span', { className: 'gl-row-label' }, t('maxQueuedLabel')),
-                h(Num, {
-                  wide: true, value: queueText.maxQueued, disabled: !writable,
-                  onChange: onQueueChange('maxQueued', 1),
-                })),
-              h('p', { className: 'gl-note' }, t('maxQueuedNote')),
-            )
-          : null,
+              h(Btn, { disabled: !writable, onClick: () => removeRow(r.provider, r.model) }, t('remove')))
+          }),
+          h('div', { className: 'gl-add' },
+            h(Selector, {
+              value: selProvider, options: catalog.providers, disabled: !writable,
+              placeholder: t('providerLabel'), onChange: setSelProvider,
+            }),
+            h(Selector, {
+              value: selModel, options: models, disabled: !writable,
+              placeholder: t('modelLabel'), onChange: setSelModel,
+            }),
+            h(Num, { value: newMax, disabled: !writable, onChange: setNewMax, placeholder: t('maxHint') }),
+            h(Btn, {
+              variant: 'primary', disabled: !writable || !selProvider || !selModel, onClick: addRow,
+            }, t('add')))),
+        h('h3', { className: 'gl-subheading' }, t('queueHeading')),
+        h('p', { className: 'gl-intro' }, t('hint')),
+        h('div', { className: 'gl-stack' },
+          h(Row, { title: t('queueTimeoutLabel'), desc: t('queueTimeoutNote') },
+            h(Num, {
+              wide: true, value: queueText.queueTimeoutMs, disabled: !writable,
+              placeholder: t('queueTimeoutHint'), onChange: onQueueChange('queueTimeoutMs', 0),
+            })),
+          h(Row, { title: t('maxQueuedLabel'), desc: t('maxQueuedNote') },
+            h(Num, {
+              wide: true, value: queueText.maxQueued, disabled: !writable,
+              onChange: onQueueChange('maxQueued', 1),
+            }))),
       )
     }
 
@@ -356,6 +432,10 @@ window.__ModuleLoader__.load({
         path.setAttribute('d', BRANCH_PATH)
         path.setAttribute('fill-rule', 'evenodd')
         path.setAttribute('clip-rule', 'evenodd')
+        // The gear is two paths (ring + inner dot); ours is one, so the
+        // leftover dot has to go or it draws through the new glyph.
+        const extra = svg.querySelectorAll('path')
+        for (let i = 1; i < extra.length; i += 1) extra[i].remove()
         svg.dataset.glNavicon = '1'
       }
     }
@@ -380,11 +460,6 @@ window.__ModuleLoader__.load({
     }
 
     // ------------------------------------------------------------------ apply
-
-    /** The `settings.section` page: renders the GenLimitCard always-expanded. */
-    function GenLimitSection(props) {
-      return GenLimitCard(Object.assign({}, props, { expanded: true }))
-    }
 
     const inject = ['slots', 'locale']
 

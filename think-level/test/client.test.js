@@ -410,9 +410,16 @@ test('the settings page lists configured rows and offers the levels of a chosen 
   mount(booted, 'settings.section', { t: (key) => key })
   await settle()
   const tree = booted.root.rerender()
-  const labels = find(tree, (n) => n.props && n.props.className === 'tl-row-label')
+  // Scoped to the configured table: `tl-title` is the harness's row-title
+  // class, so the page's other rows carry it too.
+  const rows = find(tree, (n) => n.props && n.props.className === 'tl-rows')[0]
+  const labels = find(rows, (n) => n.props && n.props.className === 'tl-title')
   assert.deepEqual(labels.map((n) => n.children), ['dgx / m1'])
-  const rowSelect = find(tree, (n) => n.type === 'select' && n.props.value === 'low')[0]
+  // Either shape: with primitives the page draws a `Selector` (the harness
+  // ships no styled `<select>`), and without them — as here, where the require
+  // stub serves react alone — it falls back to a native one.
+  const rowSelect = find(rows, (n) => n.props && n.props.value === 'low'
+    && (n.type === 'select' || typeof n.type === 'function'))[0]
   assert.ok(rowSelect, 'the row shows the level it stores')
   const efforts = booted.requests.filter((r) => String(r.url).startsWith('/api/dsh-think-level/efforts'))
   assert.equal(efforts.length, 1, 'one round-trip for the one row on screen')
