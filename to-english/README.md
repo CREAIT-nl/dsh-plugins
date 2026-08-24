@@ -97,9 +97,19 @@ under `relaxed` in the file report.
 
 ## Install
 
+Not on npm yet, and pnpm cannot install a subdirectory of a git repo — so
+clone the repo and point the profile at the folder:
+
 ```sh
-dsh plugin --profile web add @creait/dsh-to-english
+git clone https://github.com/CREAIT-nl/dsh-plugins.git
+dsh plugin --profile web add ./dsh-plugins/to-english
 ```
+
+That records a `link:` rather than copying the package in, which is what you
+want here: pnpm does not install a link target's dependencies into the linking
+project, so the profile's `node_modules` stays free of a second copy of any
+`@deepseek-ai/*` runtime. Run `pnpm install` inside `to-english/` once, then
+restart `dsh web` — the boot manifest is built at startup.
 
 The package ships its own `cordis.patch.yml`, so it inserts its roster row on
 its own — no manual profile edit. Add it to `dsh.profile.bundles` to activate
