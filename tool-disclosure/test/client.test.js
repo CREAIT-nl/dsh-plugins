@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { CONFIG_ROUTE, GROUPS_ROUTE, loadClient, propsFor, renderRow, rowsOf, settle, statsOf, switchOf } from './client-harness.js';
+import { CONFIG_ROUTE, GROUPS_ROUTE, loadClient, propsFor, renderRow, rowsOf, settle, statsOf, switchOf, walk } from './client-harness.js';
 
 const measured = (overrides = {}) => ({
 	groups: [
@@ -259,5 +259,37 @@ describe('writing', () => {
 		instance.unmount();
 		await settle();
 		assert.equal(client.requests.filter((request) => request.url === GROUPS_ROUTE).length, 1);
+	});
+});
+
+describe('the primitives path', () => {
+	// Every other test in this file runs with the seed module absent, which is
+	// the fallback arm. In a browser it always resolves, so the arm that
+	// actually ships needs its own pass — otherwise a break in it is invisible
+	// here and visible only to a user.
+	/** The element each `StatRow` puts its figure in, once the row is rendered. */
+	const figures = (instance) => walk(instance.output)
+		.filter((node) => typeof node.type === 'function' && node.props.value !== undefined && node.props.label !== undefined)
+		.flatMap((row) => walk(row.type(row.props)))
+		.filter((node) => node.props?.className === 'td-value');
+
+	it('draws its figures with the seed module Pill when the shell provides it', async () => {
+		const { client, instance } = await open({ primitives: true });
+		const pills = figures(instance);
+		assert.equal(pills.length, 2, 'both headline figures come from the primitive');
+		for (const pill of pills) assert.equal(pill.type, client.primitives.Pill);
+	});
+
+	it('reports the same figures either way, so the fallback is not a different page', async () => {
+		const withSeed = await open({ primitives: true });
+		const without = await open();
+		assert.deepEqual(statsOf(withSeed.instance), statsOf(without.instance));
+	});
+
+	it('falls back to a plain span rather than blanking the row', async () => {
+		const { instance } = await open();
+		const pills = figures(instance);
+		assert.equal(pills.length, 2);
+		for (const pill of pills) assert.equal(typeof pill.type, 'function', 'the bundle substitutes its own component');
 	});
 });

@@ -117,18 +117,33 @@ function makeReact() {
 }
 
 /**
+ * A stub of the primitives seed module, shaped like the part the bundle uses.
+ *
+ * Not the harness's real component — the browser check covers that. What it
+ * covers is that the primitives *branch executes at all*: with the seed absent
+ * `Pill` falls back to the plain span this file used to render, so without a
+ * stub every test would measure the fallback and the path that actually ships
+ * in a browser would never run.
+ */
+function makePrimitives(React) {
+	return { Pill: (props) => React.createElement('span', { 'data-primitive': 'Pill', className: props.className }, props.children) };
+}
+
+/**
  * Load the bundle and hand back its section component plus the test's controls.
  *
  * @param options - `groups` and `config` are the two GET payloads, each either
  *   a value or a thunk (a thunk is how a test makes the re-measure differ from
  *   the first read); `post` answers the write, defaulting to accepting it;
- *   either may be `'network'` for a rejected fetch.
+ *   either may be `'network'` for a rejected fetch. `primitives: true` serves
+ *   the seed-module stub, which is what every browser resolves.
  * @returns `{ Component, mount, requests, warnings, locales, inject, id }`.
  */
 export function loadClient(options = {}) {
 	const requests = [];
 	const warnings = [];
 	const { React, mount } = makeReact();
+	const primitives = options.primitives ? makePrimitives(React) : null;
 
 	const answerFor = (request) => {
 		if (request.method === 'POST') return options.post ?? { body: { writable: true } };
@@ -177,6 +192,10 @@ export function loadClient(options = {}) {
 
 	const exported = registered.factory((name) => {
 		if (name === 'react') return React;
+		if (name === '@deepseek-ai/dsh-client-ui-primitives') {
+			if (primitives === null) throw new Error('seed module absent');
+			return primitives;
+		}
 		throw new Error(`unexpected require: ${name}`);
 	});
 
@@ -195,7 +214,7 @@ export function loadClient(options = {}) {
 		},
 	});
 
-	return { id: registered.id, inject: exported.inject, Component: component, descriptor, locales, mount, requests, warnings, React };
+	return { id: registered.id, inject: exported.inject, Component: component, descriptor, locales, mount, requests, warnings, primitives, React };
 }
 
 /** Every element in a rendered tree, depth first. */
