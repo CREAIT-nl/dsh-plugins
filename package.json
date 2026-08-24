@@ -3,6 +3,7 @@
   "private": true,
   "description": "Plugins for DeepSeek Harness, published individually under @creait",
   "license": "MIT",
+  "packageManager": "pnpm@11.22.0",
   "author": "Francesco G <francesco@creait.nl>",
   "repository": {
     "type": "git",
@@ -10,6 +11,6 @@
   },
   "scripts": {
     "test": "pnpm -r --if-present test",
-    "publish-all": "pnpm -r publish --access public"
+    "publish-changed": "node scripts/publish-changed.mjs"
   }
 }

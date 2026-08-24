@@ -1,0 +1,44 @@
+name: publish
+
+# Manual only. Bump the version in the package.json of whatever changed, push,
+# then press Run workflow. Packages whose version is already on the registry are
+# skipped, so pressing it with nothing bumped is a no-op.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Plan only — show what would publish, write nothing
+        type: boolean
+        default: true
+
+concurrency: publish
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push the name@version tags
+      id-token: write   # OIDC trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; do not rely on what ships with node.
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --if-present test
+
+      - name: Publish changed packages
+        run: node scripts/publish-changed.mjs ${{ inputs.dry_run && '--dry-run' || '--tag' }}
+        env:
+          # Only used until each package has a trusted publisher configured on
+          # npmjs.com; with OIDC in place npm ignores it. Safe to leave unset then.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push tags
+        if: ${{ !inputs.dry_run }}
+        run: git push --tags
