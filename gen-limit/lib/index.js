@@ -24,11 +24,17 @@
  * loopback config route (the harness settings wire only exposes namespaces on
  * its own allowlist, which a plugin cannot widen) plus provider/model listing
  * from the live `llm` service.
+ *
+ * Waiting for a slot is what makes a long silence normal here, so this plugin
+ * also owns the consequence: see `transport.js`, which carries the provider's
+ * already-configured `streamIdleTimeoutMs` down to the socket, where undici's
+ * five-minute default would otherwise overrule it.
  */
 import { installSettingsSection } from '@deepseek-ai/dsh-settings';
 import { CapacityTimeout, makeSlotQueue } from './queue.js';
 import { Config, GENLIMIT_SETTINGS_NAMESPACE, resolveConfig } from './config.js';
 import { makeSettingsRoutes } from './settings-routes.js';
+import { installTransportTimeouts } from './transport.js';
 
 /** Stable cordis plugin name. */
 export const name = 'gen-limit';
@@ -229,6 +235,11 @@ export function apply(ctx, config) {
         setSource: (source) => { current = source; sync(); },
         onChange: sync,
     });
+
+    // A slot that frees after minutes of waiting is only useful if the stream
+    // that finally gets it is allowed to be quiet for that long. Nothing new to
+    // configure: this reads the provider's own `streamIdleTimeoutMs`.
+    installTransportTimeouts(ctx);
 
     // Plugin-owned config route (settings card read/write + provider/model
     // listing + live active counts). Registered through scoped-inject so it

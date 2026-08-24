@@ -14,7 +14,9 @@
   "files": [
     "lib/index.js",
     "lib/config.js",
+    "lib/queue.js",
     "lib/settings-routes.js",
+    "lib/transport.js",
     "client/client.cjs",
     "cordis.patch.yml"
   ],
@@ -33,7 +35,8 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
-    "@deepseek-ai/schemastery": "^3.18.1"
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "undici": "^8.10.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
@@ -41,7 +44,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19.0"
   },
   "keywords": [
     "dsh",

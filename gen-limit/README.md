@@ -44,6 +44,23 @@ hang. Only a request that exhausts its wait fails, and it fails with the code
 Reaching that point means the backend has been saturated for a sustained
 period, not that a request was unlucky with timing.
 
+**The consequence — transport timeouts.** Waiting for a slot means a stream may
+legitimately go quiet for a long time, so the limiter also makes sure the socket
+agrees. `llm-pi-ai` lets a provider declare `streamIdleTimeoutMs`, but the SSE
+stream rides Node's built-in `fetch`, whose `bodyTimeout` defaults to five
+minutes and which nothing in the harness configures — so any value above
+300000ms is unreachable. Raising it just moves the kill from the harness
+watchdog (`TIMEOUT`) to undici (`TypeError: terminated`, classified `TRANSPORT`,
+equally retryable), and each retry restarts the step from scratch and discards
+everything it had generated.
+
+So `transport.js` reads the timeout **the provider already declares** and
+installs a dispatcher that applies it to that provider's origin, plus a
+30-second margin so the harness watchdog stays the one that reports a dead
+stream. There is nothing new to configure, and no other origin is affected — MCP
+servers, web fetches and the update check keep Node's defaults. A provider that
+declares no `streamIdleTimeoutMs`, or one under five minutes, is left alone.
+
 ## Install
 
 ```sh
@@ -95,6 +112,14 @@ which a plugin cannot widen:
 `llm/stream` and `tools/pre-execute` are pre-1.0 internal seams with no
 compatibility guarantee. `peerDependencies` pins the versions this was
 built against; a harness upgrade can move them.
+
+The transport half rests on the seam Node leaves for proxies: built-in `fetch`
+takes no per-call timeout options and reads its dispatcher from a global that
+`undici`'s `setGlobalDispatcher` writes. Verified on Node 25.8.1 with undici
+8.10.0 — a 3s `bodyTimeout` installed this way killed a built-in `fetch` body at
+3.5s, where the default had taken 301s. It is a convention, not a contract; a
+runtime that stopped honouring it would put the five-minute ceiling back, which
+is where things stood before this existed.
 
 The settings nav glyph is a deliberate reach past the API. `settings.section`
 has no icon option — the shell picks the glyph from a hardcoded section-id map
