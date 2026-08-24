@@ -1,7 +1,7 @@
 {
   "name": "@creait/dsh-hookkit",
   "description": "Config-driven lifecycle hooks for DeepSeek Harness, including context injection: declare event -> handler -> outcome in cordis.patch.yml",
-  "version": "0.1.0-rc.9",
+  "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

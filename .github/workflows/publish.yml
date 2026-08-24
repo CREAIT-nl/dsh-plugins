@@ -32,12 +32,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --if-present test
 
+      # No NODE_AUTH_TOKEN: every package has a trusted publisher pinned to this
+      # repo and this workflow file, so npm authenticates off the OIDC token from
+      # id-token: write. A new package must have its publisher configured
+      # (npm trust github <pkg> --file publish.yml --repo <repo> --allow-publish)
+      # before its first CI publish, or that one package 403s.
       - name: Publish changed packages
         run: node scripts/publish-changed.mjs ${{ inputs.dry_run && '--dry-run' || '--tag' }}
-        env:
-          # Only used until each package has a trusted publisher configured on
-          # npmjs.com; with OIDC in place npm ignores it. Safe to leave unset then.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push tags
         if: ${{ !inputs.dry_run }}
