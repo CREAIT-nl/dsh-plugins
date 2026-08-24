@@ -1,7 +1,7 @@
 {
   "name": "@creait/dsh-web-search-searxng",
   "description": "SearXNG-backed search provider for the DeepSeek Harness web capability seam (ctx.web)",
-  "version": "0.1.0-rc.7",
+  "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
