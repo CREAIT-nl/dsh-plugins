@@ -30,6 +30,11 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, copyFil
 import { join, relative, extname, basename, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+// Cyclic with wholefile.js by design: it needs `streamText` and the small
+// text helpers from here, this needs its entry point. Every binding on both
+// sides is read inside a function body, never at module evaluation, so the
+// cycle resolves before anything dereferences it.
+import { translateWholeFile, WHOLE_FILE_MAX_BYTES, probeExtension } from './wholefile.js';
 
 /** Files we rewrite. Everything else is left alone. */
 const TRANSLATE_EXTENSIONS = new Set(['.js', '.cjs', '.mjs', '.jsx', '.ts', '.tsx', '.yml', '.yaml', '.md', '.json']);
@@ -753,7 +758,9 @@ export function validateSyntax(filePath, text) {
     }
   }
   if (!NODE_CHECKABLE.has(ext)) return { checked: false, ok: true };
-  const probe = join(dirname(filePath), `${basename(filePath, ext)}.dsh-to-english-check${ext}`);
+  // Resolved, not inherited: `node --check` on an ambiguous `.js` exits 0 on
+  // source that does not parse. See {@link probeExtension}.
+  const probe = join(dirname(filePath), `${basename(filePath, ext)}.dsh-to-english-check${probeExtension(filePath)}`);
   try {
     writeFileSync(probe, text, 'utf8');
     execFileSync(process.execPath, ['--check', probe], { stdio: 'pipe' });
@@ -1028,7 +1035,7 @@ export async function translateBatch(llm, selection, styleGuide, relPath, lines,
 }
 
 /** Collect a streamed completion into a string, surfacing provider errors. */
-async function streamText(llm, selection, system, messages, maxTokens, signal) {
+export async function streamText(llm, selection, system, messages, maxTokens, signal) {
   let out = '';
   for await (const chunk of llm.stream({
     provider: selection.provider,
@@ -1064,6 +1071,21 @@ export async function translateFile(llm, selection, styleGuide, packageDir, file
   }
   if (size > MAX_FILE_BYTES) {
     return { ...report, status: 'too-large', error: `${size} bytes exceeds the ${MAX_FILE_BYTES}-byte cap` };
+  }
+
+  // One pass over the whole file is the default. The segment path below is
+  // what is left for a file too large to echo back, and for a file the model
+  // could not get past a parser — there, a conservative partial translation
+  // beats none at all.
+  if (size <= WHOLE_FILE_MAX_BYTES) {
+    let whole;
+    try {
+      whole = await translateWholeFile(llm, selection, styleGuide, packageDir, file, signal);
+    } catch (error) {
+      whole = { file: rel, status: 'failed', mode: 'whole-file', error: error?.message ?? String(error) };
+    }
+    if (whole.status === 'translated' || whole.status === 'unchanged') return whole;
+    report.wholeFile = { status: whole.status, error: whole.error, ...(whole.repaired ? { repaired: whole.repaired } : {}) };
   }
 
   const original = readFileSync(file, 'utf8');
@@ -1116,6 +1138,7 @@ export async function translateFile(llm, selection, styleGuide, packageDir, file
   return {
     ...report,
     status: 'translated',
+    mode: 'segments',
     replaced: changed,
     accepted: replacements.size,
     cjkAfter: countCjk(text),
@@ -1172,6 +1195,12 @@ export async function translatePackage(ctx, packageDir, config, signal, onProgre
       report = { file: relative(packageDir, file), status: 'failed', error: error?.message ?? String(error) };
     }
     reports.push(report);
+    // A whole-file pass that needed the parser quoted back at it, or that
+    // failed outright and fell through to the segment path, is worth a line in
+    // the log: it is the signal that this file is hard for the model.
+    for (const note of report.wholeFile?.repaired ?? []) ctx.logger?.warn?.(`[dsh-to-english] ${report.file}: whole-file ${note}`);
+    if (report.wholeFile) ctx.logger?.warn?.(`[dsh-to-english] ${report.file}: whole-file pass ${report.wholeFile.status}, fell back to segments`);
+    for (const note of report.repaired ?? []) ctx.logger?.info?.(`[dsh-to-english] ${report.file}: whole-file ${note}`);
     // The affix exemption is the only edit that changes a line's shape, so it
     // is logged even on success — nothing else here is worth re-reading.
     for (const note of report.relaxed ?? []) ctx.logger?.info?.(`[dsh-to-english] ${note}`);
