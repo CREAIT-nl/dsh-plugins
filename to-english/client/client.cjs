@@ -443,12 +443,16 @@ window.__ModuleLoader__.load({
           })),
 
         // save
+        //
+        // A `primary` button is a filled capsule, and the shared disabled rule
+        // is `opacity:.4` — which greys the whole slab, not just a border. So
+        // it may only carry in-flight state, never "the form is incomplete":
+        // with nothing to save the harness renders the status as text and no
+        // button at all (`dshmarket`: `alreadyInstalled ? <span> : <Button>`).
         h('div', { className: 'te-actions' },
-          h(Btn, {
-            variant: 'primary',
-            disabled: !dirty || saving || readOnly,
-            onClick: save,
-          }, saving ? t('saved') : (dirty ? t('save') : t('saved'))),
+          dirty
+            ? h(Btn, { variant: 'primary', disabled: saving || readOnly, onClick: save }, t('save'))
+            : h('span', { className: 'te-status' }, t('saved')),
           readOnly ? h('span', { className: 'te-status' }, t('readOnly')) : null,
         ),
 
@@ -475,7 +479,9 @@ window.__ModuleLoader__.load({
                   })),
             h(Btn, {
               variant: 'primary',
-              disabled: !pkgName.trim() || translating,
+              // In-flight only. `translateNow` already no-ops on an empty
+              // field, so gating on one would just park the capsule grey.
+              disabled: translating,
               onClick: translateNow,
             }, translating ? t('translating') : t('translate'))),
           manualResult ? h('p', { className: 'te-status' }, resultLabel(manualResult)) : null,

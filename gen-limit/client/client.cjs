@@ -384,7 +384,10 @@ window.__ModuleLoader__.load({
             }),
             h(Num, { value: newMax, disabled: !writable, onChange: setNewMax, placeholder: t('maxHint') }),
             h(Btn, {
-              variant: 'primary', disabled: !writable || !selProvider || !selModel, onClick: addRow,
+              // Read-only only. A filled capsule greys out whole under the
+              // shared `:disabled{opacity:.4}` rule, so it must not also carry
+              // "no model picked yet" — `addRow` already returns on that.
+              variant: 'primary', disabled: !writable, onClick: addRow,
             }, t('add')))),
         h('h3', { className: 'gl-subheading' }, t('queueHeading')),
         h('p', { className: 'gl-intro' }, t('hint')),

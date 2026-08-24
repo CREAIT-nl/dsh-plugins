@@ -568,7 +568,10 @@ window.__ModuleLoader__.load({
             h(Button, {
               variant: 'primary',
               size: 'sm',
-              disabled: !writable || !selProvider || !selModel || !selEffort,
+              // Read-only only. A filled capsule greys out whole under the
+              // shared `:disabled{opacity:.4}` rule, so it must not also carry
+              // "the form is incomplete" — `addRow` already returns on that.
+              disabled: !writable,
               onClick: addRow,
             }, t('add'))),
           declareRow,
