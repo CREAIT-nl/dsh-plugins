@@ -1,0 +1,73 @@
+{
+  "name": "@creait/dsh-to-english",
+  "description": "Automatically rewrite market-downloaded plugins' Chinese copy/prompts into natural English, using a model you already have configured — once at install, then live-reloaded.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/config.js",
+    "lib/translate.js",
+    "lib/reload.js",
+    "lib/watcher.js",
+    "lib/routes.js",
+    "client/client.cjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "chokidar": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "translate",
+    "english",
+    "localization",
+    "market"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git",
+    "directory": "to-english"
+  },
+  "homepage": "https://github.com/CREAIT-nl/dsh-plugins/tree/main/to-english#readme",
+  "bugs": {
+    "url": "https://github.com/CREAIT-nl/dsh-plugins/issues"
+  },
+  "author": "Francesco G <francesco@creait.nl>",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
