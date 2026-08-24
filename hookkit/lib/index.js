@@ -53,10 +53,33 @@ const SESSION_EVENTS = new Set([
 	'tool/call',
 	'tool/result',
 	'compaction/start',
+	'compaction/summary',
 	'compaction/end',
 	'user/message',
 	'approval/asked',
 ]);
+
+/**
+ * The agent most recently seen on each session.
+ *
+ * A session event arrives with a session and no agent, but `ctx.tools.execute`
+ * routes approval through `exec.agent` and denies outright without one ("the
+ * call has no agent to route it through"). A hook that writes to mem0 as the
+ * context is about to be compacted would be refused by any policy that asks.
+ * The agent owning a session does not change under it, so remembering the one
+ * every step already carries gives session-event tool hooks the same standing
+ * as pre-step ones.
+ */
+const agentBySession = new WeakMap();
+
+/**
+ * Record the agent driving a session, for later session-event hooks.
+ * @param agent - the agent this step belongs to, when there is one.
+ */
+function rememberAgent(agent) {
+	const session = agent?.session;
+	if (session !== null && typeof session === 'object') agentBySession.set(session, agent);
+}
 
 /**
  * Concatenate the text blocks of one message.
@@ -68,6 +91,30 @@ function messageText(message) {
 	return blocks
 		.filter((block) => block?.type === 'text' && typeof block.text === 'string')
 		.map((block) => block.text)
+		.join('\n')
+		.trim();
+}
+
+/**
+ * The text of a bare content-block list, unwrapping a tool result's own blocks.
+ *
+ * Session events hand blocks over directly rather than wrapped in a message:
+ * `compaction/summary` carries `ContentBlock[]`, and a `tool/result` message's
+ * single `tool-result` block keeps the text one level further down in its own
+ * `content`. Reading either at the message level finds no `text` block and
+ * yields the empty string.
+ *
+ * @param blocks - a content-block list, or anything else.
+ * @returns the concatenated text, or the empty string when there is none.
+ */
+function blocksText(blocks) {
+	if (!Array.isArray(blocks)) return '';
+	return blocks
+		.map((block) => {
+			if (block?.type === 'tool-result') return blocksText(block.content);
+			return block?.type === 'text' && typeof block.text === 'string' ? block.text : '';
+		})
+		.filter((text) => text !== '')
 		.join('\n')
 		.trim();
 }
@@ -163,6 +210,71 @@ function conversationTail(messages, options = {}) {
 	const user = lastUserText(messages);
 	if (user.length > 0) parts.push(`USER: ${user}`);
 	return parts.join('\n\n');
+}
+
+/**
+ * Normalize a session event's reason to the kind a `when.reason` filter names.
+ *
+ * `turn/end` carries an object (`{ kind: 'completed' }`, `{ kind: 'error', … }`);
+ * `approval/asked` carries a bare string. Both spell the same filter.
+ *
+ * @param reason - the event's `data.reason`, in either shape.
+ * @returns the reason kind, or the empty string when the event has none.
+ */
+function reasonKind(reason) {
+	if (typeof reason === 'string') return reason;
+	if (reason !== null && typeof reason === 'object' && typeof reason.kind === 'string') return reason.kind;
+	return '';
+}
+
+/**
+ * The text a session event is *about*, per event type.
+ *
+ * Only some events carry prose, and each keeps it under its own key: the
+ * compaction summary is the distillation of the span about to be dropped, a
+ * `user/message` event's data *is* the message, and a `tool/result` wraps one.
+ *
+ * @param type - the session event type.
+ * @param data - the event's payload.
+ * @returns the event's text, or the empty string when it carries none.
+ */
+function sessionEventText(type, data) {
+	if (type === 'compaction/summary') return blocksText(data.summary);
+	if (type === 'user/message') return messageText(data);
+	if (type === 'tool/result') return blocksText(data.message?.content);
+	return typeof data.text === 'string' ? data.text : '';
+}
+
+/**
+ * Flatten one session event into the fields hooks filter and template on.
+ *
+ * A session event is `{ type, seq, time, data }`: everything a hook cares about
+ * lives under `data`, never on the envelope. Reading them off the envelope is
+ * why `{{turn}}`, `{{reason}}` and `{{content}}` rendered empty on every session
+ * event, and why a `when: { reason: [error] }` filter could never match.
+ *
+ * @param event - the appended session event.
+ * @returns the event's template-ready fields; absent ones stay `undefined` so a
+ *   filter naming them fails closed rather than matching everything.
+ */
+function sessionEventFields(event) {
+	const data = event?.data ?? {};
+	return {
+		turn: data.turn,
+		step: data.step,
+		// `tool/call` names the tool `name`; `approval/asked` names it `toolName`.
+		tool: data.name ?? data.toolName,
+		callId: data.callId,
+		compactionId: data.compactionId,
+		reason: reasonKind(data.reason),
+		content: sessionEventText(event?.type, data),
+		// `tool/call` types `arguments` as an already-encoded JSON string, while
+		// `tools/pre-execute` hands over the object. Re-encoding the string would
+		// spell the same call two different ways depending on the hook's event.
+		...(data.arguments === undefined
+			? {}
+			: { toolArgs: typeof data.arguments === 'string' ? data.arguments : JSON.stringify(data.arguments) }),
+	};
 }
 
 /**
@@ -282,6 +394,7 @@ function apply(ctx, config) {
 	const preStepHooks = byEvent.get('agent/pre-step') ?? [];
 	if (preStepHooks.length > 0) {
 		ctx.on('agent/pre-step', async ({ agent, messages, step, signal }, next) => {
+			rememberAgent(agent);
 			const decision = await next();
 			if (decision.kind === 'reject') return decision;
 			const history = sessionMessages(agent, messages);
@@ -353,6 +466,18 @@ function apply(ctx, config) {
 	const sessionHooks = [...byEvent.entries()].filter(([event]) => SESSION_EVENTS.has(event));
 	if (sessionHooks.length > 0) {
 		const sessionByEvent = new Map(sessionHooks);
+		// A session-event hook that invokes a tool needs the session's agent to
+		// route approval through (see `agentBySession`), and `agent/pre-step` is
+		// the only place one is in scope. When pre-step hooks are declared their
+		// own listener already records it; otherwise take out a bare tracker, so
+		// an observe-only declaration still costs nothing on the step path.
+		const invokesTool = sessionHooks.some(([, hooks]) => hooks.some((hook) => hook.kind === 'tool'));
+		if (invokesTool && preStepHooks.length === 0) {
+			ctx.on('agent/pre-step', async ({ agent }, next) => {
+				rememberAgent(agent);
+				return next();
+			});
+		}
 		ctx.on('session/event', (session, event) => {
 			const hooks = sessionByEvent.get(event.type);
 			if (hooks === undefined) return;
@@ -361,11 +486,8 @@ function apply(ctx, config) {
 				event: event.type,
 				sessionId: session?.id ?? '',
 				cwd: session?.cwd ?? '',
-				turn: event.turn,
-				step: event.step,
-				tool: event.tool ?? event.name,
-				reason: event.reason?.kind ?? '',
-				content: typeof event.text === 'string' ? event.text : '',
+				...sessionEventFields(event),
+				__agent: agentBySession.get(session),
 			};
 			void fireHooks(ctx, hooks, payload, AbortSignal.timeout(60_000), debug).catch((error) => {
 				ctx.logger?.warn?.(`hookkit session/${event.type} hooks failed: ${String(error)}`);
@@ -378,6 +500,7 @@ export {
 	Config,
 	abridge,
 	apply,
+	blocksText,
 	buildPayload,
 	conversationTail,
 	inject,
@@ -385,5 +508,8 @@ export {
 	lastUserText,
 	messageText,
 	name,
+	reasonKind,
+	sessionEventFields,
+	sessionEventText,
 	sessionMessages,
 };

@@ -26,6 +26,7 @@ const HOOK_EVENTS = [
 	'tool/call',
 	'tool/result',
 	'compaction/start',
+	'compaction/summary',
 	'compaction/end',
 	'user/message',
 	'approval/asked',

@@ -331,6 +331,64 @@ describe('tools/post-execute context', () => {
 	});
 });
 
+describe('session/event hooks', () => {
+	// The write half of memory: `compaction/summary` carries the model's own
+	// distillation of the span about to be dropped, which is both the moment
+	// persistence is worth most and the only text worth persisting.
+	const persist = {
+		id: 'mem0-persist-on-compaction',
+		on: 'compaction/summary',
+		do: { tool: 'mcp__mem0__add_memories', arguments: { text: '{{content}}' } },
+		inject: { as: 'none' },
+	};
+	const SUMMARY = {
+		type: 'compaction/summary',
+		seq: 12,
+		data: { compactionId: 'c-1', summary: [{ type: 'text', text: 'pins searxng engines in the profile patch' }] },
+	};
+
+	it('writes the summary the event carries, not the empty envelope', async () => {
+		const ctx = stubContext();
+		apply(ctx, new Config({ hooks: [persist] }));
+		listener(ctx, 'session/event')({ id: 'sess-1', cwd: '/repo' }, SUMMARY);
+		await settle();
+
+		assert.equal(ctx.calls.length, 1);
+		assert.equal(ctx.calls[0].name, 'mcp__mem0__add_memories');
+		assert.deepEqual(ctx.calls[0].arguments, { text: 'pins searxng engines in the profile patch' });
+	});
+
+	// Without an agent `tools.execute` denies anything that asks for approval,
+	// and a session event carries none — so the write has to borrow the one the
+	// session last stepped with.
+	it('routes the write through the agent the session last stepped with', async () => {
+		const ctx = stubContext();
+		apply(ctx, new Config({ hooks: [persist] }));
+		const session = { id: 'sess-1', cwd: '/repo' };
+		const agent = { session };
+		await listener(ctx, 'agent/pre-step')(
+			{ agent, messages: [], step: 1, signal: AbortSignal.timeout(5000) },
+			async () => ({ kind: 'enter', messages: [] }),
+		);
+		listener(ctx, 'session/event')(session, SUMMARY);
+		await settle();
+
+		assert.equal(ctx.calls[0].agent, agent);
+	});
+
+	it('tracks the agent from the pre-step listener it already has', () => {
+		const ctx = stubContext();
+		apply(ctx, new Config({ hooks: [persist, { id: 'r', on: 'agent/pre-step', do: { tool: 't' } }] }));
+		assert.deepEqual([...ctx.listeners.keys()].sort(), ['agent/pre-step', 'session/event']);
+	});
+
+	it('takes out no tracker for a session hook that invokes nothing in-process', () => {
+		const ctx = stubContext();
+		apply(ctx, new Config({ hooks: [{ ...persist, do: { http: 'http://localhost:1/notify' } }] }));
+		assert.deepEqual([...ctx.listeners.keys()], ['session/event']);
+	});
+});
+
 describe('listener registration', () => {
 	it('registers only the events that have hooks', () => {
 		const ctx = stubContext();
@@ -344,6 +402,11 @@ describe('listener registration', () => {
 		assert.equal(ctx.listeners.size, 0);
 	});
 });
+
+/** Let the session-stream hooks, which the agent loop never awaits, run to completion. */
+function settle() {
+	return new Promise((resolve) => setImmediate(resolve));
+}
 
 /** Fetch the handler registered for one event, failing loudly when absent. */
 function listener(ctx, event) {

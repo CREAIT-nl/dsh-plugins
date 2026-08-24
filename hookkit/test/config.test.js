@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 
 import { Config } from '../lib/config.js';
 import { clip, compileHooks, matches, render, renderDeep } from '../lib/config.js';
-import { abridge, conversationTail, lastUserText, sessionMessages } from '../lib/index.js';
+import { abridge, conversationTail, lastUserText, reasonKind, sessionEventFields, sessionMessages } from '../lib/index.js';
 
 /** Validate a raw hook list through the real schema, as the loader would. */
 function compile(hooks) {
@@ -239,5 +239,85 @@ describe('sessionMessages', () => {
 		const thrower = { session: { deriveMessages: () => { throw new Error('no surface'); } } };
 		assert.deepEqual(sessionMessages(thrower, [msg('u1', 'user')]).map((m) => m.id), ['u1']);
 		assert.deepEqual(sessionMessages(undefined, [msg('u1', 'user')]).map((m) => m.id), ['u1']);
+	});
+});
+
+describe('sessionEventFields', () => {
+	// Session events are `{ type, seq, time, data }`. Reading the envelope
+	// instead of `data` left every one of these fields empty, which silently
+	// turned `when: { reason: [...] }` into a filter nothing could satisfy.
+	it('reads turn and reason out of a turn/end event', () => {
+		const fields = sessionEventFields({ type: 'turn/end', seq: 9, data: { turn: 3, reason: { kind: 'error', error: {} } } });
+		assert.equal(fields.turn, 3);
+		assert.equal(fields.reason, 'error');
+	});
+
+	it('matches a reason filter that the envelope read could never satisfy', () => {
+		const [notify] = compile([{ id: 'n', on: 'turn/end', when: { reason: ['error'] }, do: { http: 'http://x' } }]).get('turn/end');
+		assert.equal(matches(notify, sessionEventFields({ type: 'turn/end', data: { turn: 1, reason: { kind: 'error' } } })), true);
+		assert.equal(matches(notify, sessionEventFields({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })), false);
+	});
+
+	// `summary` is typed `ContentBlock[]`, not a string — reading it as one is
+	// how the mem0 persist hook came to write the empty string every time.
+	it('carries the compaction summary as {{content}}', () => {
+		const fields = sessionEventFields({
+			type: 'compaction/summary',
+			data: {
+				compactionId: 'c-1',
+				summary: [{ type: 'text', text: 'the user prefers pnpm' }],
+				shadowedTokenCount: 40_000,
+			},
+		});
+		assert.equal(fields.content, 'the user prefers pnpm');
+		assert.equal(fields.compactionId, 'c-1');
+	});
+
+	// A ToolResultMessage's content is a single `tool-result` block whose own
+	// `content` holds the text, so the message-level read finds nothing.
+	it('unwraps the tool-result block a tool/result message wraps its text in', () => {
+		const fields = sessionEventFields({
+			type: 'tool/result',
+			data: {
+				turn: 1,
+				step: 2,
+				message: { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'exit 0' }] }] },
+			},
+		});
+		assert.equal(fields.content, 'exit 0');
+	});
+
+	// `tool/call` types `arguments` as an already-encoded JSON string; encoding
+	// it again would hand the hook a quoted blob to unwrap twice.
+	it('passes an already-encoded arguments string through unchanged', () => {
+		const encoded = '{"command":"ls -la"}';
+		assert.equal(sessionEventFields({ type: 'tool/call', data: { name: 'bash', arguments: encoded } }).toolArgs, encoded);
+	});
+
+	it('names the tool whichever key the event spells it with', () => {
+		assert.equal(sessionEventFields({ type: 'tool/call', data: { name: 'bash', callId: 'c1' } }).tool, 'bash');
+		assert.equal(sessionEventFields({ type: 'approval/asked', data: { toolName: 'edit' } }).tool, 'edit');
+	});
+
+	it('unwraps the message a user/message event carries', () => {
+		const data = { role: 'user', content: [{ type: 'text', text: 'ok do it' }] };
+		assert.equal(sessionEventFields({ type: 'user/message', data }).content, 'ok do it');
+	});
+
+	// An absent field has to stay absent: `matches` rejects a non-string, so a
+	// filter naming a field this event does not carry fails closed.
+	it('leaves fields the event does not carry undefined', () => {
+		const fields = sessionEventFields({ type: 'compaction/start', data: { compactionId: 'c-1', turn: 2 } });
+		assert.equal(fields.tool, undefined);
+		assert.equal(fields.toolArgs, undefined);
+		assert.equal(fields.content, '');
+	});
+});
+
+describe('reasonKind', () => {
+	it('accepts both shapes the harness emits', () => {
+		assert.equal(reasonKind({ kind: 'completed' }), 'completed');
+		assert.equal(reasonKind('user asked'), 'user asked');
+		assert.equal(reasonKind(undefined), '');
 	});
 });

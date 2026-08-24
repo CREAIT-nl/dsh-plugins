@@ -104,15 +104,32 @@ hook, not a silent no-op.
 | `tools/post-execute` | ✅ | — | context attaches to the next request |
 | `turn/start` `turn/end` `step/start` `step/end` | — | — | observe-only, not awaited |
 | `tool/call` `tool/result` | — | — | observe-only |
-| `compaction/start` `compaction/end` | — | — | observe-only |
+| `compaction/start` `compaction/summary` `compaction/end` | — | — | observe-only; `summary` carries the distillation |
 | `user/message` `approval/asked` | — | — | observe-only |
+
+An observe-only event still *acts* — it just cannot hand text back to the model.
+`do.tool` works on all of them, which is how the memory **write** below happens
+without a nudge.
 
 ### Template variables
 
 `{{output}}` (handler output), `{{userText}}`, `{{conversationTail}}`,
 `{{userTurn}}`, `{{sessionId}}`, `{{cwd}}`, `{{tool}}`, `{{toolArgs}}`,
-`{{callId}}`, `{{event}}`, `{{step}}`, `{{turn}}`, `{{reason}}`, `{{content}}`,
-`{{timestamp}}`. Unknown names render empty.
+`{{callId}}`, `{{compactionId}}`, `{{event}}`, `{{step}}`, `{{turn}}`,
+`{{reason}}`, `{{content}}`, `{{timestamp}}`. Unknown names render empty.
+
+`{{content}}` is whatever text the event is *about*, and only some events carry
+any: the summary on `compaction/summary`, the message on `user/message`, the
+result text on `tool/result`, the tool output on `tools/post-execute`. Elsewhere
+it is empty. `{{reason}}` is the kind alone — `completed`, `blocked`,
+`max-tokens`, `aborted`, `error` on `turn/end` — so `when: { reason: [error] }`
+names it directly.
+
+A `user/message` event is not only a human prompt: injected context, goal
+continuations, and the replacement that lands right after a compaction all
+arrive as one. A hook that must act on human input only should read
+`{{userText}}`, which filters to user-authored messages, rather than hooking
+the event.
 
 `{{userText}}` reads the last **user-authored** message, so an injected block can
 never feed the next turn's query with its own output.
@@ -201,6 +218,33 @@ The trade is real: recall stops being deterministic after turn one. The model
 has to notice that a turn wants memory, and sometimes it won't. `firstTurn`
 buys one search per session instead of one per turn; leaving it off buys
 recall on "ok do it" for the price of a search every turn.
+
+**mem0 write, when the context is about to be lost:**
+
+```yaml
+- id: mem0-persist-on-compaction
+  on: compaction/summary
+  do:
+    tool: mcp__mem0__add_memories
+    arguments: { text: '{{content}}' }
+  inject: { as: none }
+```
+
+Recall without a write path is a store that only ever shrinks in usefulness, and
+a hook cannot make the model save anything — `add_memories` is a tool call, and
+only the model issues those. So write from the harness instead, at the one moment
+the harness knows something is being discarded.
+
+`compaction/summary` is the right seam rather than `compaction/start` for two
+reasons. It carries the summary the compactor just wrote — an LLM distillation
+of exactly the span being dropped, so the write costs no second model call and
+needs no transcript scraping. And it fires *after* summarization but before the
+surface is replaced, so the text is complete when the hook sees it.
+
+One write per compaction, fire-and-forget, `failOpen` by default: an unreachable
+mem0 costs the memory, never the compaction. What it does not cover is the
+session that never compacts, which is most of them — for those the model still
+has to volunteer the call, so say so in the recall primer's instruction.
 
 **Block edits to a protected path:**
 
