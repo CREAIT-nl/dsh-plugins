@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 .playwright-mcp/
 *.log
 .DS_Store
@@ -7,3 +8,8 @@ node_modules/
 # beat dsh-codex-subscription's model seat). Kept out of the plugin workspace
 # repo; provenance recorded in dsh-model-picker/LOCAL.md.
 dsh-model-picker/
+
+# Pre-cleanup snapshot of the profile's node_modules/@deepseek-ai, taken while
+# tracking down which runtime dsh-recall was resolving. Kept on disk as a
+# fallback; the live profile is the source of truth.
+.parked/
