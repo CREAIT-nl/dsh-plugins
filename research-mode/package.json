@@ -1,7 +1,7 @@
 {
   "name": "@creait/dsh-research-mode",
   "description": "Deep research as an agent mode for DeepSeek Harness: a fixed, reviewed research loop that plans, researches in adaptive parallel rounds, synthesises and reviews — and only exists inside its own preset.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

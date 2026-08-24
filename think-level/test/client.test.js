@@ -18,6 +18,24 @@ import { createRoot, find } from './mini-react.js';
 
 const SRC = fs.readFileSync(fileURLToPath(new URL('../client/client.cjs', import.meta.url)), 'utf8');
 
+/**
+ * A stub of the primitives seed module, shaped like the parts the bundle uses.
+ *
+ * Not the harness's real components — the browser check covers whether the
+ * props match. What this covers is that the primitives *branch executes*: with
+ * the seed absent the page draws a native `<select>` and a plain button, so
+ * `Selector`'s Menu path and the two icons would otherwise never run in a test.
+ */
+function makePrimitives(React) {
+  const h = React.createElement
+  return {
+    Button: (props) => h('button', { 'data-primitive': 'Button', ...props }, props.children),
+    Menu: (props) => h('div', { 'data-primitive': 'Menu', menu: props }, props.anchor),
+    IconChevronDownOutline14: (props) => h('svg', { 'data-primitive': 'Chevron', ...props }),
+    IconThinkOutline16: (props) => h('svg', { 'data-primitive': 'Think', ...props }),
+  }
+}
+
 /** Boot the bundle against a fresh stub world; returns what apply() registered. */
 function boot(options = {}) {
   const root = createRoot()
@@ -67,8 +85,17 @@ function boot(options = {}) {
   const consoleStub = { warn: (...args) => warnings.push(args.join(' ')), error: () => {} }
 
   const run = new Function('window', 'require', 'fetch', 'document', 'console', 'CustomEvent', SRC)
+  // The seed module: resolved by the shell exactly like `react`, so in a
+  // browser it is always there. Serving it only on request keeps both arms
+  // reachable — the fallback markup most of this file measures, and the
+  // primitives path that actually ships.
+  const primitives = options.primitives ? makePrimitives(root.React) : null
   const requireStub = (name) => {
     if (name === 'react') return root.React
+    if (name === '@deepseek-ai/dsh-client-ui-primitives') {
+      if (primitives === null) throw new Error('seed module absent')
+      return primitives
+    }
     throw new Error('unexpected require: ' + name)
   }
   run(win, requireStub, fetchStub, doc, consoleStub, CustomEventStub)
@@ -87,7 +114,7 @@ function boot(options = {}) {
   }
   loader.loaded.factory(requireStub).apply(ctx)
   const fire = (type, event) => { for (const fn of docListeners.get(type) ?? []) fn(event) }
-  return { root, slots, warnings, requests, window: win, fire, componentFor: (name) => (slots.find((s) => s.meta.name === name) || {}).component }
+  return { root, slots, warnings, requests, primitives, window: win, fire, componentFor: (name) => (slots.find((s) => s.meta.name === name) || {}).component }
 }
 
 /** A model directory stub over one mutable snapshot. */
@@ -474,3 +501,108 @@ test('saving the table announces it', async () => {
   const posts = booted.requests.filter((r) => r.method === 'POST')
   assert.deepEqual(posts.at(-1).body, { defaults: [] }, 'removing the only row posts an empty table')
 })
+
+// Every test above this line runs with the seed module absent, which is the
+// fallback arm: a native `<select>` and a plain button. In a browser the seed
+// always resolves, so the arm that actually ships is the one no test measured.
+// These do.
+
+test('the settings page draws a portalled Menu, not a native select, with the seed module', async () => {
+  const booted = boot({
+    primitives: true,
+    routes: (url) => {
+      const text = String(url)
+      if (text.startsWith('/api/dsh-think-level/config')) return { status: 'ready', value: { defaults: [] }, writable: true, revision: 1 }
+      if (text.startsWith('/api/dsh-think-level/catalog')) return { providers: [{ id: 'dgx', name: 'DGX' }], models: { dgx: [{ id: 'm1', name: 'M One' }] } }
+      if (text.startsWith('/api/dsh-think-level/efforts')) return { efforts: LEVELS, defaultEffort: 'high' }
+      return null
+    },
+  })
+  mount(booted, 'settings.section', { t: (key) => key })
+  await settle()
+  const tree = booted.root.rerender()
+  const menus = find(tree, (n) => n.props && n.props['data-primitive'] === 'Menu')
+  assert.ok(menus.length > 0, 'the primitives path must draw a Menu')
+  assert.equal(find(tree, (n) => n.type === 'select').length, 0, 'and no native select alongside it')
+  // Portal is what keeps the menu from clipping inside the settings panel.
+  for (const menu of menus) assert.equal(menu.props.menu.portal, true)
+})
+
+test('a dropdown offers the catalog as menu items and reports only a real change', async () => {
+  const booted = boot({
+    primitives: true,
+    routes: (url) => {
+      const text = String(url)
+      if (text.startsWith('/api/dsh-think-level/config')) return { status: 'ready', value: { defaults: [] }, writable: true, revision: 1 }
+      if (text.startsWith('/api/dsh-think-level/catalog')) {
+        return { providers: [{ id: 'dgx', name: 'DGX' }, { id: 'cloud', name: 'Cloud' }], models: { dgx: [{ id: 'm1', name: 'M One' }] } }
+      }
+      if (text.startsWith('/api/dsh-think-level/efforts')) return { efforts: LEVELS, defaultEffort: 'high' }
+      return null
+    },
+  })
+  mount(booted, 'settings.section', { t: (key) => key })
+  await settle()
+  const menu = find(booted.root.rerender(), (n) => n.props && n.props['data-primitive'] === 'Menu')[0].props.menu
+  assert.deepEqual(menu.items.map((item) => ({ id: item.id, label: item.label })), [{ id: 'dgx', label: 'DGX' }, { id: 'cloud', label: 'Cloud' }])
+  assert.equal(menu.selectedId, 'dgx', 'the provider defaults to the first in the catalog')
+  // An unpicked dropdown must pass `undefined`, never the empty string: a Menu
+  // would try to match '' against an item id and highlight nothing coherently.
+  const menus = find(booted.root.rerender(), (n) => n.props && n.props['data-primitive'] === 'Menu')
+  assert.equal(menus.some((entry) => entry.props.menu.selectedId === ''), false)
+})
+
+test('the pill draws the seed module think icon rather than its inline copy', async () => {
+  // One mark across the pill, the Settings nav row and the harness's own
+  // thinking affordances — which only holds if the shell's glyph is used where
+  // the shell serves it. The hand-drawn brain is the fallback, not the default.
+  const dir = makeDirectory({ provider: 'dgx', model: 'plain' }, GROUPS)
+  const booted = boot({
+    primitives: true,
+    services: { conversation: {}, modelDirectories: { directoryFor: () => dir.directory } },
+    routes: levelsRoute([], { shape: 'models', writable: true }),
+  })
+  mount(booted, 'conversation.input.right', pillProps('s1'))
+  await settle()
+  const icons = find(booted.root.rerender(), (n) => n.props && n.props['data-primitive'] === 'Think')
+  assert.equal(icons.length, 1)
+  assert.equal(icons[0].props.className, 'tl-icon')
+  assert.equal(icons[0].props.size, 14)
+})
+
+test('the pill keeps its own glyph when the seed module is absent', async () => {
+  const dir = makeDirectory({ provider: 'dgx', model: 'plain' }, GROUPS)
+  const booted = boot({
+    services: { conversation: {}, modelDirectories: { directoryFor: () => dir.directory } },
+    routes: levelsRoute([], { shape: 'models', writable: true }),
+  })
+  mount(booted, 'conversation.input.right', pillProps('s1'))
+  await settle()
+  const icons = byClass(booted.root.rerender(), 'tl-icon')
+  assert.equal(icons.length, 1)
+  assert.equal(icons[0].type, 'svg', 'the inline brain, drawn rather than missing')
+})
+
+test('the settings buttons come from the seed module, and still work when it is absent', async () => {
+  const routes = (url) => {
+    const text = String(url)
+    if (text.startsWith('/api/dsh-think-level/config')) {
+      return { status: 'ready', value: { defaults: [{ provider: 'dgx', model: 'm1', effort: 'low' }] }, writable: true, revision: 1 }
+    }
+    if (text.startsWith('/api/dsh-think-level/catalog')) return { providers: [{ id: 'dgx', name: 'DGX' }], models: { dgx: [{ id: 'm1', name: 'M One' }] } }
+    if (text.startsWith('/api/dsh-think-level/efforts')) return { efforts: LEVELS, defaultEffort: 'high' }
+    return null
+  }
+  const seeded = boot({ primitives: true, routes })
+  mount(seeded, 'settings.section', { t: (key) => key })
+  await settle()
+  const fromSeed = find(seeded.root.rerender(), (n) => n.props && n.props['data-primitive'] === 'Button')
+  assert.ok(fromSeed.length > 0, 'the buttons are the primitive')
+
+  const plain = boot({ routes })
+  mount(plain, 'settings.section', { t: (key) => key })
+  await settle()
+  const fallback = find(plain.root.rerender(), (n) => n.type === 'button' && n.children === 'remove')
+  assert.equal(fallback.length, 1, 'and the same page still offers them without it')
+})
+

@@ -19,8 +19,13 @@
 # research agent has no reason to execute anything, and the sub-agents this
 # preset fans out inherit whatever it mounts. No `tool-workflow`: the model
 # writing its own orchestration script is the thing `deep_research` exists to
-# replace, and offering both invites it to improvise a worse loop. No skills and
-# no plan mode: there is one job here.
+# replace, and offering both invites it to improvise a worse loop. No plan mode:
+# there is one job here.
+#
+# Skills ARE mounted, because a skill is the opposite of an improvised loop — it
+# is a recipe someone already got right, and research is full of sources that
+# only answer to a particular method. Discovery costs nothing until a skill is
+# loaded: only the descriptions sit in context.
 
 # ── identity ────────────────────────────────────────────────────────────────
 
@@ -158,6 +163,24 @@
     fetch: true
     searchTimeoutMs: 60000
     fetchMaxOutputChars: 400000
+
+# ── skills ─────────────────────────────────────────────────────────────────────
+
+# Skills are per-preset: a preset sees them only if it mounts BOTH the
+# discovery provider (`skill-filesystem`) and the model-facing catalog + loader
+# (`tool-skill`). The additive form below gives research the same default roots
+# as Standard/PTC/Creator — project, user (`~/.dsh/skills`) and bundled. To
+# carry a curated set instead, set `includeDefaultRoots: false` and point
+# `customSkillDirs` at a research-only folder.
+#
+# Neither row provides a service, so neither needs an `isolate` realm:
+# `skill-filesystem` injects `skills` and registers a provider into that host
+# registry, and `tool-skill` registers into `tools`.
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
 
 # ── keeping the report ──────────────────────────────────────────────────────
 

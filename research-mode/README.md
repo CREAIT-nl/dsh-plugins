@@ -44,8 +44,12 @@ process. Choosing `Research mode` in the picker gets you an agent with
   survives the session
 - **todo**, **ask-user**, and compaction tuned so a report-sized tool result is
   not pruned to death
+- **skills** — `skill-filesystem` + `tool-skill`, over the same default roots as
+  the shipped modes, so a source that only answers to a particular method can be
+  written down once and reused. Only skill *descriptions* sit in context; a body
+  is loaded when the agent calls the `skill` tool.
 
-and, deliberately, **no shell**, **no `workflow` tool**, no skills, no plan mode.
+and, deliberately, **no shell**, **no `workflow` tool**, no plan mode.
 
 Every other mode is untouched. `deep_research` is not in their tool catalog and
 none of the guidance above is in their context window — which is the whole point

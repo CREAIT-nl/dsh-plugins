@@ -1,7 +1,7 @@
 {
   "name": "@creait/dsh-gen-limit",
   "description": "Per provider/model concurrency limiter for generating sessions, with a themed settings card.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

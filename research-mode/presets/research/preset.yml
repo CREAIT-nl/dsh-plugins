@@ -1,3 +1,3 @@
 name: Research mode
-description: Deep research as one tool call. A topic is planned into independent sub-questions, researched in adaptive parallel rounds with web search and page fetching, then synthesised into a cited report and checked against its own evidence. Carries web, files and the research loop; leaves out shell, skills and plan mode.
+description: Deep research as one tool call. A topic is planned into independent sub-questions, researched in adaptive parallel rounds with web search and page fetching, then synthesised into a cited report and checked against its own evidence. Carries web, files, skills and the research loop; leaves out shell and plan mode.
 order: 20
