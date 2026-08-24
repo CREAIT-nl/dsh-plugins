@@ -134,7 +134,9 @@ describe('installPresets', () => {
 		assert.deepEqual(installPresets({ home, source: join(scratch, 'does-not-exist') }), []);
 	});
 
-	it('reports a failure instead of throwing it into the harness', () => {
+	// POSIX-only staging: on Windows the read-only attribute of a directory
+	// does not stop file creation inside it, so the failure cannot be forced.
+	it('reports a failure instead of throwing it into the harness', { skip: process.platform === 'win32' }, () => {
 		const { home, source } = fixture();
 		const root = join(home, '.agent-presets');
 		mkdirSync(root, { recursive: true });
