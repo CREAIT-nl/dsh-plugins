@@ -79,3 +79,14 @@ Dokumentierte Randfälle (bewusst NICHT gefixt, Upstream-Themen):
   `tool-disclosure` für Token-Ersparnis; Arbeitsteilung web_fetch ↔ Neo.
 - Telegram-Bot: erster Nachricht + Whitelist noch vom Nutzer zu setzen
   (sonst schweigendes Verwerfen); danach `/sessionlist` → `/session <ID>`.
+
+## Commits & PR (Status)
+
+- 5 Commits auf `main` (4 Code-Fixes + diese Doku).
+- Push auf `CREAIT-nl/dsh-plugins` verweigert (`rolarocka` = nur Leserecht, 403).
+- Fork: **https://github.com/rolarocka/dsh-plugins** (alle 5 Commits).
+- PR an Upstream, nur die 4 Fixes:
+  **https://github.com/CREAIT-nl/dsh-plugins/pull/5**
+  (Branch `rolarocka:fix/windows-portability`; NIGHTLOG/HANDOFF aus dem PR
+  rausgelassen, liegen aber im Fork-`main`).
+- Upstream `main` unverändert → wartet auf CREAIT-Merge.

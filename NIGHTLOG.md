@@ -262,7 +262,16 @@ voll testüberdeckt) und think-level `index.js`-Rest.
 
 **Abschluss:** HANDOFF-WEITERMACHEN.md auf Nachtstand umgeschrieben.
 Endgate: **716 pass / 0 fail** · publish-changed --dry-run exit 0.
-Keine Commits — alles liegt als Working-Tree-Diffs vor.
+
+## Nachtrag — Commits & PR (nach 07:30)
+
+- 5 Commits lokal auf `main`: 4 Code-Fixes + docs (NIGHTLOG/HANDOFF).
+- Push auf `CREAIT-nl/dsh-plugins` verweigert (Account `rolarocka` nur Leserecht, 403).
+- Fork angelegt: **https://github.com/rolarocka/dsh-plugins** — alle 5 Commits gepusht.
+- PR an Upstream eröffnet, nur die 4 Code-Fixes:
+  **https://github.com/CREAIT-nl/dsh-plugins/pull/5**
+  (Branch `rolarocka:fix/windows-portability`, docs-Commit bewusst rausgelassen).
+- Upstream `main` unverändert, wartet auf CREAIT-Review.
 
 
 
