@@ -268,9 +268,12 @@ Endgate: **716 pass / 0 fail** · publish-changed --dry-run exit 0.
 - 5 Commits lokal auf `main`: 4 Code-Fixes + docs (NIGHTLOG/HANDOFF).
 - Push auf `CREAIT-nl/dsh-plugins` verweigert (Account `rolarocka` nur Leserecht, 403).
 - Fork angelegt: **https://github.com/rolarocka/dsh-plugins** — alle 5 Commits gepusht.
-- PR an Upstream eröffnet, nur die 4 Code-Fixes:
-  **https://github.com/CREAIT-nl/dsh-plugins/pull/5**
-  (Branch `rolarocka:fix/windows-portability`, docs-Commit bewusst rausgelassen).
+- **Konsolidierung:** Branch `fix/windows-portability` gelöscht, alles auf
+  Fork-`main`. Neuer PR aus `main` (alle 6 Commits inkl. Doku):
+  **https://github.com/CREAIT-nl/dsh-plugins/pull/6** (#5 geschlossen).
+- **pnpm repariert:** corepack 0.35.0 baute pnpm@11.22.0 nicht korrekt auf
+  (leerer Link `...\store\v11\links\@\pnpm\11.22.0\eeb7…4b4`). Per
+  `npm install pnpm@11.22.0 --prefix <link>` befüllt → `pnpm --version` = 11.22.0.
 - Upstream `main` unverändert, wartet auf CREAIT-Review.
 
 

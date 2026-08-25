@@ -85,8 +85,12 @@ Dokumentierte Randfälle (bewusst NICHT gefixt, Upstream-Themen):
 - 5 Commits auf `main` (4 Code-Fixes + diese Doku).
 - Push auf `CREAIT-nl/dsh-plugins` verweigert (`rolarocka` = nur Leserecht, 403).
 - Fork: **https://github.com/rolarocka/dsh-plugins** (alle 5 Commits).
-- PR an Upstream, nur die 4 Fixes:
-  **https://github.com/CREAIT-nl/dsh-plugins/pull/5**
-  (Branch `rolarocka:fix/windows-portability`; NIGHTLOG/HANDOFF aus dem PR
-  rausgelassen, liegen aber im Fork-`main`).
+- **Alle Commits auf Fork-`main` konsolidiert** (Branch `fix/windows-portability`
+  gelöscht). PR an Upstream aus `main` (alle 6 Commits inkl. Doku):
+  **https://github.com/CREAIT-nl/dsh-plugins/pull/6**
+  (#5 wurde geschlossen/ersetzt).
+- **pnpm dauerhaft repariert:** corepack 0.35.0 extrahierte pnpm@11.22.0 nicht
+  (leerer Link). Per `npm install pnpm@11.22.0 --prefix <corepack-link>`
+  befüllt; `pnpm --version` im Repo liefert jetzt 11.22.0. Workaround-Shim
+  `%TEMP%\night\bin` nicht mehr nötig.
 - Upstream `main` unverändert → wartet auf CREAIT-Merge.
