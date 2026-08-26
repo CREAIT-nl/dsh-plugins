@@ -1,6 +1,6 @@
 # dsh-plugins
 
-Plugins for [DeepSeek Harness](https://github.com/deepseek-ai). One repo, eight
+Plugins for [DeepSeek Harness](https://github.com/deepseek-ai). One repo, nine
 packages, published independently under `@creait`. They came out of running dsh
 against self-hosted models, and each closes a gap the harness leaves open.
 
@@ -13,13 +13,15 @@ against self-hosted models, and each closes a gap the harness leaves open.
 | **[research-mode](./research-mode)**<br>`@creait/dsh-research-mode` | Deep research as an agent **mode**: a fixed, reviewed loop that plans, researches in adaptive parallel rounds, synthesises and reviews. | A loop the model rewrites per call re-earns the same mistakes per call. Shipping it as a preset also keeps it out of every session that is not research. |
 | **[think-level](./think-level)**<br>`@creait/dsh-think-level` | A reasoning effort per provider and model, plus one control to change it for the session you are in. | dsh's effort dropdown is per session and remembered nowhere, so "this model should think hard" is re-typed in every new conversation. Subagents are never asked at all. |
 | **[tool-disclosure](./tool-disclosure)**<br>`@creait/dsh-tool-disclosure` | Progressive tool disclosure: a deferred group of tools costs one catalog line until the model loads it with `tool_search`. | dsh advertises every mounted tool on every request. An MCP server's 24 browser schemas are ~4.4k tokens charged to every session, including the ones that never open a browser. |
+| **[tailnet-gateway](./tailnet-gateway)**<br>`@creait/dsh-tailnet-gateway` | An identity-gated loopback gateway: reach a loopback-bound dsh from your own Tailscale devices, with Settings, Models and Plugins actually working. | dsh gates its privileged `/api` methods on the request looking loopback, and `--trusted-host` does not open that gate. Over a tailnet the shell loads and the pages that configure it return 403. |
 | **[to-english](./to-english)**<br>`@creait/dsh-to-english` | Rewrites a market-installed plugin's Chinese copy into English with a model you already have configured, guarding the Chinese the program itself reads. | Most of the market is written in Chinese, and a blunt find-and-replace gives you a plugin that reads English and no longer works. |
 
 hookkit is the general-purpose one: a small engine that ships **no hooks of its
 own** — 13 lifecycle events × 3 handler kinds (in-process tool, shell, HTTP) ×
 3 outcomes (inject context, deny the call, fire-and-forget). It is what makes
 something like memory recall a config change rather than a plugin. The rest are
-single-purpose. web-search-searxng and web-fetch are both providers for the same
+single-purpose. tailnet-gateway is the only one that is about reaching dsh at
+all rather than what it does once you are there. web-search-searxng and web-fetch are both providers for the same
 `ctx.web` seam and compose: together they give an agent search and page reading
 without a third-party round trip. research-mode wants web-fetch mounted —
 without it, its researchers are capped at search snippets. to-english is the
@@ -37,8 +39,8 @@ dsh plugin --profile web add @creait/dsh-hookkit
 Every package ships its own bundle patch, so that command mounts the row rather
 than only recording the dependency. Mounting is not the same as switching on:
 the two `ctx.web` providers register themselves and then wait to be pointed at
-something, and hookkit mounts with no hooks declared. Each README says which
-keys finish the job.
+something, hookkit mounts with no hooks declared, and tailnet-gateway wants
+`tailscale serve` in front of it. Each README says which keys finish the job.
 
 ## Develop
 
@@ -57,7 +59,7 @@ done
 Then:
 
 ```sh
-pnpm test        # 577 tests across the eight packages
+pnpm test        # 756 tests across the nine packages
 ```
 
 Do not run `pnpm install` at the root — it would replace those symlinks with
@@ -85,13 +87,14 @@ Versions are independent; publish only what changed:
 cd hookkit && npm publish --access public
 ```
 
-`pnpm publish-all` does every package that has a new version. Scoped packages
+`pnpm publish-changed` does every package whose version is not yet on the
+registry (add `--dry-run` to see the plan first). Scoped packages
 default to restricted, so `--access public` matters on a package's first
 publish.
 
 ## Caveat
 
-All eight bind to pre-1.0 internal dsh seams with no compatibility guarantee.
+All nine bind to pre-1.0 internal dsh seams with no compatibility guarantee.
 `peerDependencies` pins the versions each was built against; a harness upgrade
 can move them. Each README has a "What breaks this" section.
 

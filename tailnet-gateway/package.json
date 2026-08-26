@@ -1,0 +1,69 @@
+{
+  "name": "@creait/dsh-tailnet-gateway",
+  "description": "Reach a loopback-bound dsh from your own Tailscale devices, with Settings, Models and Plugins working, gated on Tailscale identity and an optional device allowlist.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/config.js",
+    "lib/gateway.js",
+    "lib/settings-routes.js",
+    "lib/tailnet.js",
+    "client/client.cjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "tailscale",
+    "tailnet",
+    "gateway",
+    "remote-access"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREAIT-nl/dsh-plugins.git",
+    "directory": "tailnet-gateway"
+  },
+  "homepage": "https://github.com/CREAIT-nl/dsh-plugins/tree/main/tailnet-gateway#readme",
+  "bugs": {
+    "url": "https://github.com/CREAIT-nl/dsh-plugins/issues"
+  },
+  "author": "Francesco G <francesco@creait.nl>",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

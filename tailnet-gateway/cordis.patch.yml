@@ -1,0 +1,17 @@
+# dsh-tailnet-gateway bundle patch: inserts the host-side plugin row into the
+# web profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field) over dsh-base; activate with
+#   dsh plugin --profile web add link:<path-to-this-package>
+#
+# The row is a bare plugin by package name: the node half (exports ".") runs in
+# the host process (the loopback listener that `tailscale serve` publishes, the
+# settings section, and the config routes). The `dsh.client` declaration in
+# package.json makes the browser half (exports "./client", served at
+# /plugins/@creait/dsh-tailnet-gateway/client.js) load in the web GUI — the
+# Tailnet Access settings page.
+#
+# The gateway is inert without a webserver, so a headless profile can carry the
+# row harmlessly.
+- insert:
+    - id: tailnet-gateway
+      name: '@creait/dsh-tailnet-gateway'
