@@ -101,7 +101,7 @@ network — a LAN wiki, an internal dashboard:
 ```yaml
 - id: web-fetch
   config:
-    allowHosts: ['wiki.lan', 'dashboard.lan']
+    allowHosts: ['intranet.example', 'status.example']
 ```
 
 ## Known limitation: DNS rebinding
