@@ -114,6 +114,16 @@ function parseTarget(raw) {
 	return url;
 }
 
+/** Whether an HTTP(S) proxy is configured via the conventional environment variables. */
+function proxyConfigured() {
+	return Boolean(
+		process.env.HTTPS_PROXY ||
+		process.env.HTTP_PROXY ||
+		process.env.https_proxy ||
+		process.env.http_proxy,
+	);
+}
+
 /**
  * Refuse a URL whose host resolves anywhere the harness should not be reaching.
  *
@@ -149,6 +159,11 @@ async function assertReachable(url, options) {
 	try {
 		addresses = await lookup(bare, { all: true });
 	} catch (error) {
+		// With an HTTP(S) proxy configured, name resolution and egress happen at
+		// the proxy and the local resolver may not see public names (e.g. a
+		// corporate gateway). Fall through to the proxied fetch instead of
+		// refusing on a lookup this environment cannot complete.
+		if (proxyConfigured()) return;
 		throw new WebError(`web fetch: cannot resolve ${bare}: ${String(error)}`, 'WEB_BLOCKED_URL', { cause: error });
 	}
 	if (addresses.length === 0) {
