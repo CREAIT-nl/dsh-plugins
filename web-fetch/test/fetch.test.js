@@ -162,3 +162,42 @@ test('honours an already-aborted signal without touching the network', async () 
 		/aborted/,
 	);
 });
+
+const PROXY_VARS = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'];
+
+function withProxyEnv(on) {
+	const prev = new Map(PROXY_VARS.map((v) => [v, process.env[v]]));
+	for (const v of PROXY_VARS) {
+		if (on) process.env[v] = 'http://proxy.invalid:8080';
+		else delete process.env[v];
+	}
+	return () => {
+		for (const [v, value] of prev) {
+			if (value === undefined) delete process.env[v];
+			else process.env[v] = value;
+		}
+	};
+}
+
+test('an unresolvable host is refused when no proxy is configured', async () => {
+	const restore = withProxyEnv(false);
+	globalThis.fetch = async () => {
+		throw new Error('must not be called');
+	};
+	try {
+		await assert.rejects(provider().fetch({ url: 'http://unreachable.invalid/' }), /cannot resolve/);
+	} finally {
+		restore();
+	}
+});
+
+test('with a proxy configured, a locally-unresolvable host falls through to the proxied fetch', async () => {
+	const restore = withProxyEnv(true);
+	globalThis.fetch = async () => textResponse('via proxy', { type: 'text/plain' });
+	try {
+		const result = await provider().fetch({ url: 'http://unreachable.invalid/' });
+		assert.equal(result.body.content, 'via proxy');
+	} finally {
+		restore();
+	}
+});
