@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 
 import { resolveConfig, DEFAULT_PROMPT } from '../lib/config.js';
 import {
@@ -90,7 +90,7 @@ test('listTranslatableFiles skips node_modules, dist, and non-target extensions'
   writeFileSync(join(dir, 'package.json'), '{}');
   writeFileSync(join(dir, 'pnpm-lock.yaml'), 'x');
 
-  const files = listTranslatableFiles(dir).map((f) => f.replace(dir, ''));
+  const files = listTranslatableFiles(dir).map((f) => f.slice(dir.length).split(sep).join('/'));
   assert.ok(files.includes('/lib/index.js'));
   assert.ok(files.includes('/README.md'));
   assert.ok(files.includes('/package.json'));
@@ -202,7 +202,7 @@ test('listTranslatableFiles skips vendored bundles and our own backups', () => {
   writeFileSync(join(dir, 'lib', 'index.js'), 'x');
   writeFileSync(join(dir, 'lib', 'index.js.zh.bak'), 'x');
   writeFileSync(join(dir, 'lib', 'vendor', 'tokenizer.json'), '{}');
-  const files = listTranslatableFiles(dir).map((f) => f.replace(dir, ''));
+  const files = listTranslatableFiles(dir).map((f) => f.slice(dir.length).split(sep).join('/'));
   assert.deepEqual(files, ['/lib/index.js']);
 });
 
@@ -367,7 +367,7 @@ test('listTranslatableFiles skips a doc that has an English twin beside it', () 
   writeFileSync(join(dir, 'README_EN.md'), '[中文](README.md) | **English**');
   writeFileSync(join(dir, 'GUIDE.md'), 'no twin, so it is fair game');
 
-  const files = listTranslatableFiles(dir).map((f) => f.replace(dir, ''));
+  const files = listTranslatableFiles(dir).map((f) => f.slice(dir.length).split(sep).join('/'));
   assert.ok(!files.includes('/README.md'));
   assert.ok(files.includes('/README_EN.md'));
   assert.ok(files.includes('/GUIDE.md'));

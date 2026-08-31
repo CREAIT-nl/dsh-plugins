@@ -85,7 +85,7 @@ export function watchForNewPlugins(ctx, profileDir, config, onPackage) {
     });
   };
 
-  const schedule = (packageName, packageDir) => {
+  const schedule = (packageName, packageDir, delay = SETTLE_MS) => {
     // (Re)start the settle timer; a burst of writes resets it.
     if (timers.has(packageName)) clearTimeout(timers.get(packageName));
     timers.set(packageName, setTimeout(() => {
@@ -96,7 +96,7 @@ export function watchForNewPlugins(ctx, profileDir, config, onPackage) {
         const count = (retries.get(packageName) ?? 0) + 1;
         if (count <= MAX_RETRIES) {
           retries.set(packageName, count);
-          schedule(packageName, packageDir);
+          schedule(packageName, packageDir, RETRY_MS);
         }
         return;
       }
@@ -123,7 +123,9 @@ export function watchForNewPlugins(ctx, profileDir, config, onPackage) {
     const rel = path.slice(nodeModulesDir.length).replace(/^[/\\]+/, '');
     const parts = rel.split(/[/\\]/);
     if (parts.length < 1 || parts.length > 2) return;
+    if (parts[0].startsWith('.')) return; // .pnpm, .bin, … are store plumbing
     if (parts.length === 2 && !parts[0].startsWith('@')) return; // nested non-scope dir
+    if (parts.length === 1 && parts[0].startsWith('@')) return; // a scope dir is never itself a package
     const packageName = parts.join('/');
     schedule(packageName, path);
   };

@@ -24,7 +24,10 @@ import { RESEARCH_SCRIPT } from '../lib/script.js';
 import * as tool from '../lib/tool.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (path) => readFileSync(join(ROOT, path), 'utf8');
+// Git checkouts on Windows carry CRLF (`core.autocrlf`), while every regex
+// below anchors on `\n`. Normalizing at the single read site keeps the tests
+// byte-honest on Linux and alive on Windows.
+const read = (path) => readFileSync(join(ROOT, path), 'utf8').replace(/\r\n/g, '\n');
 const manifest = JSON.parse(read('package.json'));
 const patch = read('cordis.patch.yml');
 const preset = read('presets/research/agent.cordis.yml');

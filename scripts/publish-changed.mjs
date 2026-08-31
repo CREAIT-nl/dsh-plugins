@@ -17,8 +17,18 @@ const dryRun = process.argv.includes('--dry-run')
 const wantTags = process.argv.includes('--tag')
 const inCI = !!process.env.GITHUB_ACTIONS
 
-const run = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts })
+// On Windows pnpm/npm are .cmd shims, which Node only spawns through a shell.
+// With shell mode the arguments must ride in one pre-joined command line;
+// an args array alongside `shell` is deprecated (DEP0190).
+const winShell = process.platform === 'win32'
+const spawn = (cmd, args, opts = {}) => {
+  const base = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }
+  return winShell
+    ? execFileSync([cmd, ...args].join(' '), { ...base, shell: true })
+    : execFileSync(cmd, args, base)
+}
+
+const run = (cmd, args, opts = {}) => spawn(cmd, args, opts)
 
 // pnpm knows which directories are workspace members; gitignored trees
 // (dsh-model-picker) are never checked out in CI, so they cannot leak in.
@@ -113,7 +123,8 @@ for (const p of todo) {
   try {
     // stdio is inherited so the interactive 2FA browser hand-off reaches the
     // terminal; that means the failure reason has to be re-derived, not parsed.
-    execFileSync('npm', args, { cwd: p.path, stdio: 'inherit' })
+    if (winShell) execFileSync(['npm', ...args].join(' '), { cwd: p.path, stdio: 'inherit', shell: true })
+    else execFileSync('npm', args, { cwd: p.path, stdio: 'inherit' })
   } catch {
     if (!dryRun && versionIsUp(p.name, p.version)) {
       console.log(`\n${p.name}@${p.version} is already on the registry — skipping.`)
