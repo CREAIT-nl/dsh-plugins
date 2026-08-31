@@ -1,7 +1,7 @@
 {
   "name": "@creait/dsh-web-fetch",
   "description": "Guarded local fetch provider for the DeepSeek Harness web capability seam (ctx.web) — the backend dsh's shipped web_fetch tool is missing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
