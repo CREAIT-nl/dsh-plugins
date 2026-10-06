@@ -62,22 +62,25 @@ everywhere.
 dsh plugin --profile web add @creait/dsh-research-mode
 ```
 
-Restart dsh — the boot manifest is assembled at startup. The plugin copies its
-preset into `<dsh home>/.agent-presets/research/`, and `Research mode` appears in
-the picker.
+Restart dsh — the boot manifest is assembled at startup. The bundle ships the
+preset as a declaration row (`presets/research.patch.yml`), and `Research mode`
+appears in the picker.
 
-That directory is writable and the copy is yours to edit. The installer records
-what it wrote and **will not overwrite a preset you have changed**; on upgrade it
-leaves your version alone and says so in the log.
+That row is yours to edit: override it by id (`preset-research`) in a later patch
+layer, or edit it through the Web editor, which rewrites `config.plugins` into
+your profile patch. dsh no longer reads the old `$DSH_HOME/.agent-presets/`
+directory, so an edited copy left there has no effect.
 
-### Prerequisite: a fetch provider
+### Fetching pages
 
-The preset mounts `tool-web` with `fetch: true`. dsh implements `web_fetch` in
-full but ships no fetch provider, so without one every fetch call fails and the
-researchers are capped at search snippets — which is worth considerably less
-than being able to open the page.
+The preset mounts `tool-web` with `fetch: true`, and on dsh 0.2 that works out of
+the box: `dsh-base` mounts `@deepseek-ai/dsh-web-fetch-http`, which registers an
+HTTP fetch provider that refuses non-public destinations. (On dsh 0.1 no
+provider shipped and every fetch call failed, capping the researchers at search
+snippets — which is worth considerably less than being able to open the page.)
 
-[`@creait/dsh-web-fetch`](../web-fetch) is that provider:
+[`@creait/dsh-web-fetch`](../web-fetch) remains an option when you want the
+guarded local provider instead of the built-in one:
 
 ```yaml
 - id: web
@@ -93,7 +96,8 @@ than being able to open the page.
       name: '@creait/dsh-web-fetch'
 ```
 
-If you are knowingly running without one, set `fetch: false` in the preset.
+If you are knowingly running without any fetch provider, set `fetch: false` in
+the preset.
 
 The preset also raises `fetchMaxOutputChars` from its 200,000 default to 400,000.
 `tool-web` applies that cap to the *source* before turndown converts it, not to
@@ -164,14 +168,14 @@ per-call guess.
 It is **not** the capacity mechanism — see [Width is not concurrency](#width-is-not-concurrency).
 Pin the width to shape the report; capacity is gen-limit's job, not this one's.
 
-The value is a deployment-wide setting, not a per-session one: it persists in
-`~/.dsh/settings.yaml` under the `dsh-research-mode` namespace and applies to
-every research run until changed. The tool reads it at call time, so a change
-takes effect on the next call without a restart.
+The value is a deployment-wide setting, not a per-session one: it persists as a
+profile-patch override on the `research-mode` row and applies to every research
+run until changed. The tool reads it at call time, so a change takes effect on
+the next call without a restart.
 
 | | |
 | --- | --- |
-| Namespace | `dsh-research-mode` |
+| Settings form | `research-mode` — the roster row's profile entry id, which is what dsh 0.2 keys forms by |
 | Key | `width` — `0` means no pin |
 | Route | `GET`/`POST` `/api/dsh-research-mode/config`, loopback only |
 
@@ -266,19 +270,18 @@ Set on the `research-mode-tool` row inside the preset:
 
 | Specifier | Plane | Injects | Does |
 | --- | --- | --- | --- |
-| `@creait/dsh-research-mode` | roster (profile bundle) | *nothing required*; reaches for `settings` and `webServer` through scoped injects | Installs the preset, registers the `dsh-research-mode` settings namespace, serves the width-pin route, and ships the composer control. Registers no tool, no prompt, no command — nothing the model can see. |
+| `@creait/dsh-research-mode` | roster (profile bundle) | *nothing required*; reaches for `settings` and `webServer` through scoped injects | Sets this row's settings page policy, serves the width-pin route, and ships the composer control. Registers no tool, no prompt, no command — nothing the model can see. |
 | `@creait/dsh-research-mode/tool` | agent (inside the preset) | `tools`, `workflowEngine` | Registers `deep_research`. |
 
 They are separate modules rather than one behind a config flag because Cordis
-`inject` is all-required and gates loading. The Web surface disables
-`workflow-worker-thread` on the host plane and each preset mounts its own, so a
-roster row declaring `workflowEngine` would wait forever for a service that
-composition never publishes — and the preset would never install, so the mode
-would never appear.
+`inject` is all-required and gates loading. The Web surface provides
+`workflowEngine` per preset, so a roster row declaring it would wait forever for
+a service the host composition never publishes.
 
 For the same reason the tool row must sit **inside** the group carrying
-`isolate: { workflowEngine: true }`, alongside the `workflow-worker-thread` row.
-The realm is entry-local and invisible to siblings outside the group.
+`isolate: { workflowEngine: true }`, alongside the `workflow-ptc` and
+`ptc-runtime` rows. The realm is entry-local and invisible to siblings outside
+the group.
 
 To put `deep_research` in another mode, copy that group into its preset.
 

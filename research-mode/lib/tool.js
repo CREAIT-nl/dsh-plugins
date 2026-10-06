@@ -22,7 +22,7 @@
  *
  * @module @creait/dsh-research-mode/tool
  */
-import { pinnedWidth, RESEARCH_SETTINGS_NAMESPACE } from './config.js';
+import { pinnedWidth, RESEARCH_ENTRY_ID } from './config.js';
 import { renderReport } from './render.js';
 import { PLANNER_SCHEMA, RESEARCHER_SCHEMA } from './schemas.js';
 import { RESEARCH_SCRIPT } from './script.js';
@@ -95,13 +95,13 @@ function cleanQuestions(questions) {
 }
 
 /**
- * The width the user pinned in the composer, read live from the settings
- * namespace the roster half registers.
+ * The width the user pinned in the composer, read live from the settings form
+ * the roster row's Config projects.
  *
  * Read rather than injected: the roster half runs on the host plane and this one
  * inside the preset's realm, and the whole point of that split is that neither
- * depends on the other mounting. A missing settings service, a namespace nobody
- * ever wrote, a harness that moved the API — all of them mean "no pin", which is
+ * depends on the other mounting. A missing settings service, a row nobody ever
+ * wrote, a harness that moved the API — all of them mean "no pin", which is
  * exactly the behaviour this tool had before the control existed.
  * @param ctx - the tool half's plugin context.
  * @returns the pinned width, or `undefined` when nothing is pinned.
@@ -112,7 +112,7 @@ export function readPinnedWidth(ctx) {
 		if (settings === undefined || settings === null) return undefined;
 		const descriptor = settings
 			.describe({ redactSecrets: true })
-			.find((candidate) => String(candidate.ns) === RESEARCH_SETTINGS_NAMESPACE);
+			.find((candidate) => String(candidate.ns) === RESEARCH_ENTRY_ID);
 		return pinnedWidth(descriptor?.value);
 	} catch {
 		return undefined;
@@ -299,7 +299,7 @@ export const name = 'research-mode-tool';
 
 /**
  * The registries this half needs. `tools` is host-plane; `workflowEngine` is
- * provided by the `workflow-worker-thread` row sharing this preset's realm, and
+ * provided by the `workflow-ptc` row sharing this preset's realm, and
  * declaring it here is what makes the row wait for that mount rather than
  * registering a tool whose engine is not there yet.
  */

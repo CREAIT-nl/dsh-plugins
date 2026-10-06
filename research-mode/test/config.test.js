@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { RESEARCH_SETTINGS_NAMESPACE, WIDTH_AUTO, normalizeWidth, pinnedWidth } from '../lib/config.js';
+import { RESEARCH_ENTRY_ID, WIDTH_AUTO, normalizeWidth, pinnedWidth } from '../lib/config.js';
 import { CONFIG_ROUTE, isLoopbackRequest, viewOf } from '../lib/settings-routes.js';
 
 describe('normalizeWidth', () => {
@@ -101,7 +101,7 @@ describe('viewOf', () => {
 	const ctxWith = (settings) => ({ get: (name) => (name === 'settings' ? settings : undefined) });
 	const service = (descriptor, writable = true) => ({
 		writable,
-		describe: () => (descriptor === undefined ? [] : [{ ns: RESEARCH_SETTINGS_NAMESPACE, ...descriptor }]),
+		describe: () => (descriptor === undefined ? [] : [{ ns: RESEARCH_ENTRY_ID, ...descriptor }]),
 	});
 
 	it('reports unavailable when the settings service is absent', () => {

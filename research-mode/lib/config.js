@@ -19,32 +19,46 @@
  * `width`. Any value >= 1 is the user saying they want that width whatever the
  * model asks for, clamped to the preset row's `maxWidth` like any other width.
  *
- * NOTE on the name: this key is `width` on the ROSTER row (the pin, 0 = auto)
+ * NOTE on the names: this key is `width` on the ROSTER row (the pin, 0 = auto)
  * and `width` again on the TOOL row inside the preset (the per-call default, 4).
- * They are different settings in different files. This key is also the settings
- * namespace key persisted in `settings.yaml`, which is why it is not renamed to
- * something less collision-prone: the name is part of the stored format and the
- * route's wire payload.
+ * They are different settings in different files.
  *
- * The namespace is registered by the roster half (host plane, where `settings`
- * and `webServer` live) and READ by the tool half (agent plane, inside the
- * preset's realm). They share this module and nothing else — no service, no
- * injection — which keeps the roster half's "registers nothing" claim intact.
+ * Since dsh 0.2 the settings service keys forms by PROFILE ENTRY ID rather than
+ * by a plugin-registered namespace, so the pin is addressed by the roster row's
+ * id ({@link RESEARCH_ENTRY_ID}) and `width` is declared `.volatile()` for the
+ * form to project it. The browser control still speaks its own route segment
+ * ({@link RESEARCH_SETTINGS_NAMESPACE}) — that name is part of the wire payload
+ * and of the stored override's history, so it did not move with the key.
+ *
+ * The row is registered by the roster half (host plane, where `settings` and
+ * `webServer` live) and READ by the tool half (agent plane, inside the preset's
+ * realm). They share this module and nothing else — no service, no injection —
+ * which keeps the roster half's "registers nothing" claim intact.
  *
  * @module @creait/dsh-research-mode/config
  */
 import z from '@deepseek-ai/schemastery';
-import { settingsNamespace } from '@deepseek-ai/dsh-settings';
 
-/** Settings namespace of the research mode. */
-export const RESEARCH_SETTINGS_NAMESPACE = settingsNamespace('dsh-research-mode');
+/**
+ * Profile entry id of the roster row, as declared in `cordis.patch.yml`.
+ * The settings service reports and accepts edits under this id, so it is the
+ * handle both halves use to find the width pin.
+ */
+export const RESEARCH_ENTRY_ID = 'research-mode';
+
+/** Route segment and display namespace of the composer's width control. */
+export const RESEARCH_SETTINGS_NAMESPACE = 'dsh-research-mode';
 
 /** The `width` value meaning "no pin — let the call decide". */
 export const WIDTH_AUTO = 0;
 
-/** Schemastery schema, validated + persisted by the dsh settings provider. */
+/**
+ * Schemastery schema, validated by the loader and projected by the settings
+ * service. `width` is `.volatile()` so its form is editable without remounting
+ * the plugin.
+ */
 export const Config = z.object({
-	width: z.number().step(1).default(WIDTH_AUTO),
+	width: z.number().step(1).default(WIDTH_AUTO).volatile(),
 });
 
 /**

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { describe, it } from 'node:test';
 
-import { RESEARCH_SETTINGS_NAMESPACE } from '../lib/config.js';
+import { RESEARCH_ENTRY_ID, RESEARCH_SETTINGS_NAMESPACE } from '../lib/config.js';
 import * as roster from '../lib/index.js';
 import { CONFIG_ROUTE } from '../lib/settings-routes.js';
 import { RESEARCH_SCRIPT } from '../lib/script.js';
@@ -27,15 +27,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 const manifest = JSON.parse(read('package.json'));
 const patch = read('cordis.patch.yml');
-const preset = read('presets/research/agent.cordis.yml');
-const presetMeta = read('presets/research/preset.yml');
+const preset = read('presets/research.patch.yml');
 
 describe('the package manifest', () => {
 	it('ships every file it lists, and lists every module it ships', () => {
 		for (const file of manifest.files) assert.ok(existsSync(join(ROOT, file)), `listed but missing: ${file}`);
 
 		const listed = new Set(manifest.files);
-		for (const module of ['index', 'tool', 'config', 'settings-routes', 'script', 'schemas', 'render', 'home', 'preset-install']) {
+		for (const module of ['index', 'tool', 'config', 'settings-routes', 'script', 'schemas', 'render']) {
 			assert.ok(listed.has(`lib/${module}.js`), `lib/${module}.js would not be published`);
 		}
 		assert.ok(listed.has('client/client.cjs'), 'the browser half would not be published');
@@ -49,9 +48,11 @@ describe('the package manifest', () => {
 		}
 	});
 
-	it('points the harness at its bundle patch', () => {
-		assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
-		assert.ok(manifest.files.includes('cordis.patch.yml'));
+	it('points the harness at its bundle patches', () => {
+		assert.deepEqual(manifest.dsh.bundle.patch, ['./cordis.patch.yml', './presets/research.patch.yml']);
+		for (const file of manifest.dsh.bundle.patch) {
+			assert.ok(manifest.files.includes(file.slice(2)), `${file} is patched but not published`);
+		}
 	});
 });
 
@@ -112,6 +113,14 @@ describe('the roster half', () => {
 		assert.equal(CONFIG_ROUTE, `/api/${RESEARCH_SETTINGS_NAMESPACE}/config`);
 	});
 
+	// dsh 0.2 keys settings forms by PROFILE ENTRY ID, so the id this package
+	// reads and writes has to be the id the bundle patch mounts. Drift here is
+	// silent: the control renders, and every write lands nowhere.
+	it('addresses the settings form by the row id the bundle patch mounts', () => {
+		assert.equal(RESEARCH_ENTRY_ID, 'research-mode');
+		assert.match(patch, new RegExp(`^\\s+- id: ${RESEARCH_ENTRY_ID}$`, 'm'));
+	});
+
 	it('is named as the row the bundle patch inserts', () => {
 		assert.match(patch, new RegExp(`name: '${manifest.name.replace('/', '\\/')}'`));
 		assert.match(patch, /id: research-mode/);
@@ -137,7 +146,16 @@ describe('the agent half', () => {
 		const group = preset.slice(preset.indexOf('- id: research'), preset.indexOf('- id: tool-web'));
 		assert.match(group, /name: cordis:group/);
 		assert.match(group, /isolate:\n\s+workflowEngine: true/);
-		assert.match(group, /name: '@deepseek-ai\/dsh-workflow-worker-thread'/);
+		// The engine moved: `dsh-workflow-worker-thread` was removed from the
+		// harness and `dsh-workflow-ptc` replaces it.
+		assert.match(group, /name: '@deepseek-ai\/dsh-workflow-ptc'/);
+		assert.doesNotMatch(group, /name: '@deepseek-ai\/dsh-workflow-worker-thread'/);
+		// And the PTC runtime must NOT be mounted here. It PROVIDES `ptcRuntime`,
+		// while this realm isolates only `workflowEngine`; a provider inside a
+		// realm that does not isolate its own service publishes process-globally,
+		// `dsh-agent-presets` rejects the whole mount, and the mode disappears
+		// from the picker with nothing in the log. It is a host-plane row.
+		assert.doesNotMatch(group, /name: '@deepseek-ai\/dsh-ptc-runtime-node'/);
 		assert.match(group, /name: '@creait\/dsh-research-mode\/tool'/);
 	});
 
@@ -199,17 +217,36 @@ describe('the browser half', () => {
 describe('the preset', () => {
 	it('is written in English throughout', () => {
 		for (const [label, text] of [
-			['agent.cordis.yml', preset],
-			['preset.yml', presetMeta],
+			['cordis.patch.yml', patch],
+			['presets/research.patch.yml', preset],
 		]) {
 			const cjk = text.match(/[　-〿぀-ヿ一-鿿＀-￯]/g) ?? [];
 			assert.deepEqual(cjk, [], `${label} carries CJK: ${cjk.join('')}`);
 		}
 	});
 
-	it('names itself for the picker', () => {
-		assert.match(presetMeta, /^name: /m);
-		assert.match(presetMeta, /^description: /m);
+	// dsh 0.2 split the persona into a REQUIRED `prefix` and an optional
+	// `suffix`. The pre-0.2 `text` field now fails schema validation, and a
+	// preset whose child rejects its config is reported broken by the registry —
+	// the mode then never reaches the picker, with nothing on stderr and the
+	// bundle still listed as installed.
+	it('addresses the persona by prefix, the field dsh 0.2 requires', () => {
+		const persona = preset.slice(preset.indexOf('- id: persona'), preset.indexOf('- id: agent-instructions'));
+		assert.match(persona, /^\s+prefix: /m);
+		assert.doesNotMatch(persona, /^\s+text: /m);
+	});
+
+	// dsh no longer reads `$DSH_HOME/.agent-presets`, so the preset has to reach
+	// the picker as a declaration row. A directory-form preset would install
+	// cleanly and never appear — the failure this test exists to catch.
+	it('declares itself as an agent-preset row, not a directory', () => {
+		assert.match(preset, /name: '@deepseek-ai\/dsh-agent-preset'/);
+		assert.match(preset, /^\s+id: research$/m);
+		assert.match(preset, /^\s+name: Research mode$/m);
+		assert.match(preset, /^\s+description: /m);
+		assert.match(preset, /^\s+order: 20$/m);
+		assert.match(preset, /^\s+plugins:$/m);
+		assert.ok(!existsSync(join(ROOT, 'presets/research')), 'the legacy directory form is still shipped');
 	});
 });
 

@@ -19,27 +19,30 @@
  * plugin entry points and mounts on two planes.
  *
  *   ROSTER PLANE — this module, mounted by the profile bundle.
- *     Syncs the bundled `research` preset into `<dsh home>/.agent-presets` so the
- *     mode appears in the picker, registers the `dsh-research-mode` settings
- *     namespace, and serves the loopback route its composer control reads and
- *     writes. What it does NOT register is anything the model can see: no tool,
- *     no prompt section, no command, no injected service. A session on another
- *     mode gets the same system prompt and the same tool catalog it got before
- *     this package was installed — that is the claim this design has to earn,
- *     and the one worth verifying after install. The width control is browser
- *     chrome and gates itself on the session's preset, so it costs those
- *     sessions a settings namespace nobody reads and nothing else.
+ *     Declares this plugin's settings page policy and serves the loopback route
+ *     its composer control reads and writes. What it does NOT register is
+ *     anything the model can see: no tool, no prompt section, no command, no
+ *     injected service. A session on another mode gets the same system prompt and
+ *     the same tool catalog it got before this package was installed — that is
+ *     the claim this design has to earn, and the one worth verifying after
+ *     install. The width control is browser chrome and gates itself on the
+ *     session's preset, so it costs those sessions a settings form nobody reads
+ *     and nothing else.
  *
  *   AGENT PLANE — `@creait/dsh-research-mode/tool`, mounted by the row inside
- *     `presets/research/agent.cordis.yml`. Registers `deep_research`, and only
- *     sessions that chose the mode pay for it.
+ *     `presets/research.patch.yml`. Registers `deep_research`, and only sessions
+ *     that chose the mode pay for it.
  *
- * They are separate entry points rather than one module behind a config flag —
- * vet-mode's shape — because the halves need different service dependencies and
- * `inject` is a module-level declaration that gates loading. The agent half must
- * inject `workflowEngine`, which on the web surface is disabled on the host plane
- * and provided per-preset; a roster row declaring it would wait forever for a
- * service that composition never publishes, and the preset would never install.
+ * They are separate entry points rather than one module behind a config flag
+ * because the halves need different service dependencies and `inject` is a
+ * module-level declaration that gates loading. The agent half must inject
+ * `workflowEngine`, which on the web surface is provided per-preset; a roster row
+ * declaring it would wait forever for a service this composition never
+ * publishes.
+ *
+ * Since dsh 0.2 the preset is a declaration row in this bundle's patch rather
+ * than a directory under `<dsh home>/.agent-presets` — the harness no longer
+ * reads that directory. See `presets/research.patch.yml`.
  *
  * The loop's design — planner, adaptive rounds driven by the researchers' own
  * declared gaps, synthesis, adversarial review — is ported from
@@ -48,40 +51,41 @@
  *
  * @module @creait/dsh-research-mode
  */
-import { installSettingsSection } from '@deepseek-ai/dsh-settings';
-import { Config, RESEARCH_SETTINGS_NAMESPACE } from './config.js';
-import { installPresets } from './preset-install.js';
+import { Config, RESEARCH_ENTRY_ID, RESEARCH_SETTINGS_NAMESPACE } from './config.js';
 import { makeSettingsRoutes } from './settings-routes.js';
 
 /** Stable Cordis plugin name. */
 export const name = 'research-mode';
 
-export { Config, RESEARCH_SETTINGS_NAMESPACE, WIDTH_AUTO, pinnedWidth } from './config.js';
-export { installPresets } from './preset-install.js';
+export { Config, RESEARCH_ENTRY_ID, RESEARCH_SETTINGS_NAMESPACE, WIDTH_AUTO, pinnedWidth } from './config.js';
 export { renderCoverage, renderReport } from './render.js';
 export { PLANNER_SCHEMA, RESEARCHER_SCHEMA } from './schemas.js';
 export { RESEARCH_SCRIPT } from './script.js';
 
 /**
- * Install the mode: the preset files, the width namespace, and the route the
- * composer control uses to move it.
+ * Install the mode: the settings page policy and the route the composer control
+ * uses to move the width pin.
+ *
+ * Takes no config. The row's `width` is not read here — the settings service
+ * projects it straight off this plugin's `Config`, and the agent half reads the
+ * live value at call time.
  * @param ctx - host plugin context.
- * @param config - the roster row's config; `{ width }`, where 0 means "no pin".
  */
-export function apply(ctx, config) {
-	installPresets({ logger: ctx.logger });
-
-	// The pinned width. Persisted through the dsh settings provider so it
-	// survives a restart, and read live by the AGENT half at call time — the two
-	// share the namespace name and nothing else.
+export function apply(ctx) {
+	// The pinned width. dsh's settings service projects this row's Config
+	// (`./config.js`, where `width` is `.volatile()`) as a form keyed by the
+	// profile entry id, so a write persists into the profile patch and the AGENT
+	// half reads the live value at call time — the two share
+	// `RESEARCH_ENTRY_ID` and nothing else.
 	//
-	// Both hooks are required no-ops: the helper calls them unconditionally, and
-	// there is nothing here to recompute. The tool half re-reads the namespace at
-	// call time rather than caching a resolved value, so a write needs no
-	// invalidation and no source to be threaded anywhere.
-	installSettingsSection(ctx, RESEARCH_SETTINGS_NAMESPACE, Config, config ?? {}, {
-		setSource: () => {},
-		onChange: () => {},
+	// `auto: false` because this package ships its own composer control instead
+	// of an auto-generated settings page. The policy does not remove config read
+	// or write; it only says which surface draws the field.
+	ctx.inject(['settings'], (sctx) => {
+		sctx.effect(
+			() => sctx.settings.configure({ auto: false }, ctx.fiber),
+			'research-mode: settings page policy',
+		);
 	});
 
 	// The control's read/write path. Registered through scoped-inject so it is

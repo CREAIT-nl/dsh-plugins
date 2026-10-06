@@ -277,7 +277,7 @@ describe('readPinnedWidth', () => {
 	/** A settings service holding one namespace value. */
 	const settingsWith = (value) => ({
 		get: (name) => (name === 'settings'
-			? { describe: () => [{ ns: 'dsh-research-mode', value, revision: 1 }] }
+			? { describe: () => [{ ns: 'research-mode', value, revision: 1 }] }
 			: undefined),
 	});
 

@@ -1,11 +1,20 @@
 /**
  * /api/dsh-research-mode/config — the composer control's read/write path.
  *
- * Why a plugin-owned route instead of the settings RPC: the harness `settings.*`
- * wire only exposes namespaces on a hard-coded allowlist, and a plugin cannot
- * widen it. The namespace IS registered host-side (see `../lib/index.js`), so
- * this plugin serves its own loopback-only endpoint that reads and writes it
- * through the settings service.
+ * Why a plugin-owned route instead of the settings RPC: the route is
+ * loopback-only, so a width write never travels over a remote connection.
+ *
+ * That was not the original reason. On dsh 0.1 the `settings.*` wire exposed only
+ * an allowlisted set of namespaces and a plugin could not widen it, so there was
+ * no alternative. On 0.2 that constraint is gone — forms are keyed by profile
+ * entry id and every registered one is described — and
+ * `ctx.remote.settings.update(RESEARCH_ENTRY_ID, …)` would do the same job from
+ * the browser half. Collapsing this route into that call is a deliberate change
+ * to keep loopback-only writes, not a mechanical simplification.
+ *
+ * Either way the roster row's Config is projected as a volatile form host-side
+ * (see `../lib/config.js` and `../lib/index.js`), and this endpoint reads and
+ * writes that same form through the settings service.
  *
  *   GET  /api/dsh-research-mode/config -> view (value/base/user/writable/revision)
  *   POST /api/dsh-research-mode/config -> { width } applies a validated write and
@@ -15,7 +24,7 @@
  * is the part worth copying exactly rather than re-deriving, since it is what
  * keeps a settings write off the network.
  */
-import { RESEARCH_SETTINGS_NAMESPACE, normalizeWidth } from './config.js';
+import { RESEARCH_ENTRY_ID, normalizeWidth } from './config.js';
 
 /** The route the composer control talks to. */
 export const CONFIG_ROUTE = '/api/dsh-research-mode/config';
@@ -70,14 +79,17 @@ async function readJsonBody(req) {
 }
 
 /**
- * This plugin's descriptor out of the settings service.
+ * This row's form out of the settings service.
+ *
+ * dsh 0.2 keys forms by profile entry id, so this matches the roster row's id
+ * rather than a plugin-registered namespace.
  * @param settings - the resolved settings service.
- * @returns the descriptor, or `undefined` when the namespace is not registered.
+ * @returns the descriptor, or `undefined` when the row is not mounted.
  */
 function descriptorOf(settings) {
 	return settings
 		.describe({ redactSecrets: true })
-		.find((candidate) => String(candidate.ns) === RESEARCH_SETTINGS_NAMESPACE);
+		.find((candidate) => String(candidate.ns) === RESEARCH_ENTRY_ID);
 }
 
 /** The namespace descriptor as the control needs to see it. */
@@ -126,7 +138,7 @@ export function makeSettingsRoutes(ctx) {
 					// value already reads 3 and the write would be skipped — leaving nothing
 					// in the user layer. Change the seed later and the pin silently evaporates.
 					if (descriptor?.user?.width !== width) {
-						await settings.update(RESEARCH_SETTINGS_NAMESPACE, { width }, descriptor?.revision);
+						await settings.update(RESEARCH_ENTRY_ID, { width }, descriptor?.revision);
 					}
 				} catch (error) {
 					writeJson(res, 409, { error: `write failed: ${String(error)}` });
